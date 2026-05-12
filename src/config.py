@@ -2,13 +2,16 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-RAW_DATA_PATH = BASE_DIR / "data" / "raw" / "original_data.csv"
+CUST_DATA_PATH = BASE_DIR / "data" / "raw" / "CUST_DATA.csv"
+CLAIM_DATA_PATH = BASE_DIR / "data" / "raw" / "CLAIM_DATA.csv"
+RAW_DATA_ENCODING = "utf-16"
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 ARTIFACTS_DIR = BASE_DIR / "artifacts"
 
 TARGET_COL = "SIU_CUST_YN"
 ID_COL = "CUST_ID"
-DROP_COLS = ["CUST_ID", "DIVIDED_SET"]
+DIVIDED_SET_COL = "DIVIDED_SET"
+DROP_COLS = [ID_COL, DIVIDED_SET_COL]
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.3

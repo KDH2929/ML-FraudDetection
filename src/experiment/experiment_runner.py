@@ -1,80 +1,152 @@
 import json
+
 import pandas as pd
-from pathlib import Path
-from src.config import PROCESSED_DIR, ARTIFACTS_DIR, TARGET_COL, DROP_COLS
-from src.preprocessing.preprocessor_factory import get_strategy
-from src.pipeline.data_loader import load_and_split
-from src.pipeline import pipeline_builder, trainer
+
+from src.config import ARTIFACTS_DIR
 from src.models.model_factory import get_model
-from src.optimization.sampler_factory import get_sampler
-from src.optimization.feature_selector import FeatureSelector
-from src.utils import save_load, metrics
+from src.pipeline import pipeline_builder, trainer
+from src.pipeline.data_loader import load_and_split
+from src.preprocessing.preprocessor_factory import list_strategies
+from src.preprocessing.processed_data import ensure_processed_csv, ensure_processed_csvs
+from src.utils import metrics, save_load
 
 
-MEMBERS = ["member_a", "member_b", "member_c"]
+STRATEGIES = list_strategies()
+MODEL_OPTIONS = ["lgbm", "rf", "logistic"]
 
 
-def run(member: str, model_name: str = "lgbm", sampler_method: str = "smote", selector_method: str = None):
-    """특정 멤버의 실험 1회 실행"""
-    processed_csv = PROCESSED_DIR / f"{member}_preprocessed.csv"
-    if not processed_csv.exists():
-        print(f"[SKIP] {processed_csv} 파일이 없습니다.")
-        return None
+def _resolve_models(model_name="lgbm"):
+    normalized = str(model_name).lower()
+    if normalized == "all":
+        return list(MODEL_OPTIONS)
+    return [normalized]
 
+
+def _result_filename(strategy_id: str):
+    return ARTIFACTS_DIR / f"experiment_result_{strategy_id}.csv"
+
+
+def _run_single_model(strategy_id: str, processed_csv: str, model_name: str):
     train_X, test_X, train_y, test_y = load_and_split(str(processed_csv))
 
-    sampler = get_sampler(sampler_method)
-    selector = FeatureSelector(method=selector_method)
-    selector.fit(train_X, train_y)
-    train_X = selector.transform(train_X)
-    test_X = selector.transform(test_X)
-
     model = get_model(model_name)
-    pipeline = pipeline_builder.build(get_strategy(member), model, sampler=sampler)
+    # 현재 공통 실행은 모델 비교까지만 담당하고, 세부 최적화는 수동으로 진행한다.
+    pipeline = pipeline_builder.build(strategy=None, model=model, sampler=None, selector=None)
     fitted = trainer.train(pipeline, train_X, train_y)
 
     y_pred = fitted.predict(test_X)
     result = metrics.evaluate(test_y, y_pred)
-    result["member"] = member
+    result["strategy"] = strategy_id
     result["model"] = model_name
-    metrics.print_report(member, result)
-
-    result_df = pd.DataFrame([result])
-    save_load.save_result(result_df, ARTIFACTS_DIR / f"experiment_result_{member}.csv")
-    save_load.save_pipeline(fitted, ARTIFACTS_DIR / "best_pipeline.pkl")
-
-    return result
+    return result, fitted
 
 
-def run_all(model_name: str = "lgbm", sampler_method: str = "smote", selector_method: str = None):
-    """전체 멤버 실험 실행 후 비교표 출력"""
+def run_strategy(
+    strategy_id: str,
+    model_name: str = "lgbm",
+    force_preprocess: bool = False,
+):
+    # CSV가 없으면 전략을 실행해 만들고, 있으면 그대로 재사용한다.
+    processed_csv = ensure_processed_csv(strategy_id, force=force_preprocess)
+    if processed_csv is None:
+        return []
+
+    results = []
+    best_result = None
+    best_pipeline = None
+
+    for current_model in _resolve_models(model_name=model_name):
+        result, fitted = _run_single_model(
+            strategy_id=strategy_id,
+            processed_csv=processed_csv,
+            model_name=current_model,
+        )
+        metrics.print_report(
+            strategy_id,
+            {
+                "model": result["model"],
+                "recall_class1": result["recall_class1"],
+                "f1_class1": result["f1_class1"],
+                "f1_macro": result["f1_macro"],
+            },
+        )
+        results.append(result)
+        if best_result is None or result["f1_class1"] > best_result["f1_class1"]:
+            best_result = result
+            best_pipeline = fitted
+
+    result_df = pd.DataFrame(results).sort_values(
+        by=["f1_class1", "recall_class1", "f1_macro"],
+        ascending=False,
+    )
+    save_load.save_result(result_df, _result_filename(strategy_id))
+    if best_pipeline is not None:
+        save_load.save_pipeline(
+            best_pipeline,
+            ARTIFACTS_DIR / f"{strategy_id}_{best_result['model']}_pipeline.pkl",
+        )
+    return results
+
+
+def run(
+    strategy_id: str,
+    model_name: str = "lgbm",
+    force_preprocess: bool = False,
+):
+    return run_strategy(
+        strategy_id=strategy_id,
+        model_name=model_name,
+        force_preprocess=force_preprocess,
+    )
+
+
+def run_all(
+    model_name: str = "lgbm",
+    force_preprocess: bool = False,
+):
+    # 구현된 모든 전략에 대해 CSV 생성 여부를 먼저 맞춘다.
+    ensure_processed_csvs(STRATEGIES, force=force_preprocess)
+
     all_results = []
-    best = {"f1_class1": -1}
-
-    for member in MEMBERS:
-        result = run(member, model_name=model_name, sampler_method=sampler_method, selector_method=selector_method)
-        if result is None:
-            continue
-        all_results.append(result)
-        if result["f1_class1"] > best["f1_class1"]:
-            best = result
+    for strategy_id in STRATEGIES:
+        strategy_results = run_strategy(
+            strategy_id=strategy_id,
+            model_name=model_name,
+            force_preprocess=False,
+        )
+        all_results.extend(strategy_results)
 
     if not all_results:
-        print("실행된 실험이 없습니다. processed CSV 파일을 먼저 준비하세요.")
-        return
+        print("실행 가능한 실험이 없습니다. 전략을 구현하거나 전처리 CSV를 준비해주세요.")
+        return []
 
-    summary = pd.DataFrame(all_results)
-    print("\n===== 전체 비교표 =====")
-    print(summary.to_string(index=False))
+    summary = pd.DataFrame(all_results).sort_values(
+        by=["f1_class1", "recall_class1", "f1_macro"],
+        ascending=False,
+    )
+    save_load.save_result(summary, ARTIFACTS_DIR / "experiment_result_all.csv")
 
+    best = summary.iloc[0].to_dict()
     best_info = {
-        "best_member": best.get("member"),
+        "best_strategy": best.get("strategy"),
+        "model": best.get("model"),
         "f1_class1": best.get("f1_class1"),
         "recall_class1": best.get("recall_class1"),
         "f1_macro": best.get("f1_macro"),
-        "model": best.get("model"),
     }
+
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
     with open(ARTIFACTS_DIR / "best_info.json", "w", encoding="utf-8") as f:
         json.dump(best_info, f, ensure_ascii=False, indent=2)
-    print(f"\n최고 성능: {best_info}")
+
+    best_pipeline_path = ARTIFACTS_DIR / f"{best['strategy']}_{best['model']}_pipeline.pkl"
+    if best_pipeline_path.exists():
+        save_load.save_pipeline(
+            save_load.load_pipeline(best_pipeline_path),
+            ARTIFACTS_DIR / "best_pipeline.pkl",
+        )
+
+    print("\n===== 전체 비교 결과 =====")
+    print(summary.to_string(index=False))
+    print(f"\n최고 성능 조합: {best_info}")
+    return all_results
