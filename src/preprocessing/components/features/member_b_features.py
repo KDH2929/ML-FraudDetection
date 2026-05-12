@@ -956,3 +956,397 @@ class MedicalFeature_v2:
         new_cols = [c for c in self.claim_features_.columns if c != "CUST_ID"]
         X[new_cols] = X[new_cols].fillna(0)
         return X
+"""
+Member B v3 Features - Phase 3
+신규 Feature 클래스들
+"""
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import IsolationForest
+
+
+# ===== Phase 3: 신규 Feature =====
+
+
+class InteractionFeature:
+    """Feature 간 상호작용 패턴 (v3 신규)"""
+
+    def __init__(self):
+        self.claim_features_ = None
+
+    def fit(self, X: pd.DataFrame, y=None, claim_df: pd.DataFrame = None):
+        if claim_df is None:
+            raise ValueError("InteractionFeature 는 claim_df가 필요합니다.")
+        self.claim_features_ = self._build_features(claim_df, X)
+        return self
+
+    def _build_features(self, claim_df: pd.DataFrame, cust_df: pd.DataFrame) -> pd.DataFrame:
+        df_claim = claim_df.copy()
+        grp = df_claim.groupby('CUST_ID')
+
+        # 먼저 기본 집계
+        interaction_df = pd.DataFrame({'CUST_ID': df_claim['CUST_ID'].unique()})
+
+        # 1. 고액 청구 × 집중도
+        if 'DMND_AMT' in df_claim.columns and 'RECP_DATE' in df_claim.columns:
+            dmnd_threshold = df_claim['DMND_AMT'].quantile(0.9)
+            df_claim['IS_HIGH_DMND'] = (df_claim['DMND_AMT'] > dmnd_threshold).astype(int)
+
+            high_dmnd_ratio = grp['IS_HIGH_DMND'].mean().reset_index(name='high_dmnd_ratio')
+            interaction_df = interaction_df.merge(high_dmnd_ratio, on='CUST_ID', how='left')
+
+            # 30일 내 청구 횟수 계산
+            df_claim['RECP_DATE'] = pd.to_datetime(df_claim['RECP_DATE'], errors='coerce')
+            df_claim_with_date = df_claim.dropna(subset=['RECP_DATE']).copy()
+
+            if len(df_claim_with_date) > 0:
+                df_claim_with_date = df_claim_with_date.sort_values(['CUST_ID', 'RECP_DATE'])
+
+                def max_claims_in_30d(dates):
+                    dates = sorted(dates)
+                    if not dates:
+                        return 0
+                    max_count = 1
+                    left = 0
+                    for right in range(len(dates)):
+                        while dates[right] >= dates[left] + pd.Timedelta(days=30):
+                            left += 1
+                        max_count = max(max_count, right - left + 1)
+                    return max_count
+
+                burst_30d = df_claim_with_date.groupby('CUST_ID')['RECP_DATE'].apply(
+                    lambda x: max_claims_in_30d(x.tolist())
+                ).reset_index(name='burst_30d')
+                interaction_df = interaction_df.merge(burst_30d, on='CUST_ID', how='left')
+
+                # 상호작용: 고액 청구 비율 × 집중도
+                interaction_df['INTER_HIGH_DMND_X_BURST'] = (
+                    interaction_df['high_dmnd_ratio'] * interaction_df['burst_30d']
+                )
+
+        # 2. 네트워크 분산도 × 금액
+        if 'HOSP_CODE' in df_claim.columns and 'CHME_LICE_NO' in df_claim.columns and 'DMND_AMT' in df_claim.columns:
+            hosp_degree = grp['HOSP_CODE'].nunique().reset_index(name='hosp_degree')
+            doc_degree = grp['CHME_LICE_NO'].nunique().reset_index(name='doc_degree')
+            interaction_df = interaction_df.merge(hosp_degree, on='CUST_ID', how='left')
+            interaction_df = interaction_df.merge(doc_degree, on='CUST_ID', how='left')
+
+            graph_degree = interaction_df['hosp_degree'] + interaction_df['doc_degree']
+            claim_count = grp.size().reset_index(name='claim_count')
+            interaction_df = interaction_df.merge(claim_count, on='CUST_ID', how='left')
+
+            total_dmnd = grp['DMND_AMT'].sum().reset_index(name='total_dmnd')
+            interaction_df = interaction_df.merge(total_dmnd, on='CUST_ID', how='left')
+
+            # 상호작용: 그래프 분산도 × 평균 청구금액
+            interaction_df['INTER_GRAPH_X_AVG_DMND'] = (
+                graph_degree * (interaction_df['total_dmnd'] / interaction_df['claim_count'].replace(0, 1))
+            )
+
+        # 3. 병원-의사 일치도
+        if 'HOSP_CODE' in df_claim.columns and 'CHME_LICE_NO' in df_claim.columns:
+            df_claim['HOSP_CODE'] = df_claim['HOSP_CODE'].fillna('UNKNOWN')
+            df_claim['CHME_LICE_NO'] = df_claim['CHME_LICE_NO'].fillna('UNKNOWN')
+
+            # 병원 대비 의사 비율
+            interaction_df['INTER_DOC_HOSP_MISMATCH'] = (
+                interaction_df['doc_degree'] / interaction_df['hosp_degree'].replace(0, 1)
+            )
+
+        # 임시 컬럼 제거
+        cols_to_drop = ['high_dmnd_ratio', 'burst_30d', 'hosp_degree', 'doc_degree', 'claim_count', 'total_dmnd']
+        interaction_df = interaction_df.drop(columns=[c for c in cols_to_drop if c in interaction_df.columns], errors='ignore')
+
+        interaction_df = interaction_df.fillna(0)
+        return interaction_df
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        X = X.merge(self.claim_features_, on="CUST_ID", how="left")
+        new_cols = [c for c in self.claim_features_.columns if c != "CUST_ID"]
+        X[new_cols] = X[new_cols].fillna(0)
+        return X
+
+
+class SequenceFeature:
+    """청구 시퀀스 및 시계열 추세 (v3 신규)"""
+
+    def __init__(self):
+        self.claim_features_ = None
+
+    def fit(self, X: pd.DataFrame, y=None, claim_df: pd.DataFrame = None):
+        if claim_df is None:
+            raise ValueError("SequenceFeature 는 claim_df가 필요합니다.")
+        self.claim_features_ = self._build_features(claim_df)
+        return self
+
+    def _build_features(self, claim_df: pd.DataFrame) -> pd.DataFrame:
+        df_claim = claim_df.copy()
+
+        if 'RECP_DATE' not in df_claim.columns or 'DMND_AMT' not in df_claim.columns:
+            return pd.DataFrame({'CUST_ID': claim_df['CUST_ID'].unique()})
+
+        df_claim['RECP_DATE'] = pd.to_datetime(df_claim['RECP_DATE'], errors='coerce')
+        df_claim = df_claim.dropna(subset=['RECP_DATE', 'DMND_AMT'])
+        df_claim = df_claim.sort_values(['CUST_ID', 'RECP_DATE'])
+
+        grp = df_claim.groupby('CUST_ID')
+        sequence_df = pd.DataFrame({'CUST_ID': df_claim['CUST_ID'].unique()})
+
+        # 1. 청구금액 선형 회귀 기울기 (시간에 따른 추세)
+        def calculate_slope(group):
+            if len(group) < 2:
+                return 0
+            dates = group['RECP_DATE']
+            amounts = group['DMND_AMT']
+
+            # 날짜를 숫자로 변환 (첫 날짜부터의 일수)
+            x = (dates - dates.min()).dt.days.values
+            y = amounts.values
+
+            if len(x) < 2 or np.std(x) == 0:
+                return 0
+
+            # 선형 회귀 기울기
+            slope = np.polyfit(x, y, 1)[0]
+            return slope
+
+        dmnd_slope = grp.apply(calculate_slope).reset_index(name='SEQ_DMND_SLOPE')
+        sequence_df = sequence_df.merge(dmnd_slope, on='CUST_ID', how='left')
+
+        # 2. 청구 간격 가속도 (간격이 점점 짧아지는지)
+        df_claim['CLAIM_INTERVAL'] = grp['RECP_DATE'].diff().dt.days
+
+        def calculate_interval_slope(group):
+            intervals = group['CLAIM_INTERVAL'].dropna()
+            if len(intervals) < 2:
+                return 0
+            x = np.arange(len(intervals))
+            y = intervals.values
+            if np.std(x) == 0:
+                return 0
+            return np.polyfit(x, y, 1)[0]
+
+        interval_slope = grp.apply(calculate_interval_slope).reset_index(name='SEQ_INTERVAL_ACCEL')
+        sequence_df = sequence_df.merge(interval_slope, on='CUST_ID', how='left')
+
+        # 3. 최근 집중도 (최근 3개월 청구 비율)
+        if len(df_claim) > 0:
+            max_date = df_claim['RECP_DATE'].max()
+            df_claim['IS_RECENT_3M'] = (df_claim['RECP_DATE'] >= max_date - pd.Timedelta(days=90)).astype(int)
+
+            recent_ratio = grp['IS_RECENT_3M'].mean().reset_index(name='SEQ_RECENT_3M_RATIO')
+            sequence_df = sequence_df.merge(recent_ratio, on='CUST_ID', how='left')
+
+        sequence_df = sequence_df.fillna(0)
+        return sequence_df
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        X = X.merge(self.claim_features_, on="CUST_ID", how="left")
+        new_cols = [c for c in self.claim_features_.columns if c != "CUST_ID"]
+        X[new_cols] = X[new_cols].fillna(0)
+        return X
+
+
+class AnomalyScoreFeature:
+    """통계적 이상 탐지 점수 (v3 신규)"""
+
+    def __init__(self, contamination=0.1):
+        self.contamination = contamination
+        self.claim_features_ = None
+
+    def fit(self, X: pd.DataFrame, y=None, claim_df: pd.DataFrame = None):
+        if claim_df is None:
+            raise ValueError("AnomalyScoreFeature 는 claim_df가 필요합니다.")
+        self.claim_features_ = self._build_features(claim_df)
+        return self
+
+    def _build_features(self, claim_df: pd.DataFrame) -> pd.DataFrame:
+        df_claim = claim_df.copy()
+        grp = df_claim.groupby('CUST_ID')
+        anomaly_df = pd.DataFrame({'CUST_ID': df_claim['CUST_ID'].unique()})
+
+        # 1. Isolation Forest score (청구금액, 지급금액)
+        if 'DMND_AMT' in df_claim.columns and 'PAYM_AMT' in df_claim.columns:
+            amount_agg = grp.agg(
+                dmnd_mean=('DMND_AMT', 'mean'),
+                dmnd_max=('DMND_AMT', 'max'),
+                paym_mean=('PAYM_AMT', 'mean'),
+                paym_max=('PAYM_AMT', 'max'),
+            ).reset_index()
+
+            # Isolation Forest
+            features_for_iso = amount_agg[['dmnd_mean', 'dmnd_max', 'paym_mean', 'paym_max']].fillna(0)
+
+            if len(features_for_iso) > 10:  # 최소 샘플 수
+                iso = IsolationForest(contamination=self.contamination, random_state=42)
+                anomaly_scores = iso.fit_predict(features_for_iso)
+                anomaly_scores = iso.score_samples(features_for_iso)  # 이상치 점수 (-1에 가까울수록 이상)
+                amount_agg['ANOM_ISO_AMOUNT_SCORE'] = anomaly_scores
+            else:
+                amount_agg['ANOM_ISO_AMOUNT_SCORE'] = 0
+
+            anomaly_df = anomaly_df.merge(amount_agg[['CUST_ID', 'ANOM_ISO_AMOUNT_SCORE']], on='CUST_ID', how='left')
+
+        # 2. 청구금액 분포 왜도/첨도
+        if 'DMND_AMT' in df_claim.columns:
+            from scipy import stats
+
+            def safe_skew(series):
+                try:
+                    return stats.skew(series) if len(series) > 3 else 0
+                except:
+                    return 0
+
+            def safe_kurtosis(series):
+                try:
+                    return stats.kurtosis(series) if len(series) > 3 else 0
+                except:
+                    return 0
+
+            skew_kurt = grp['DMND_AMT'].agg([safe_skew, safe_kurtosis]).reset_index()
+            skew_kurt.columns = ['CUST_ID', 'ANOM_DMND_SKEW', 'ANOM_DMND_KURT']
+            anomaly_df = anomaly_df.merge(skew_kurt, on='CUST_ID', how='left')
+
+        anomaly_df = anomaly_df.fillna(0)
+        return anomaly_df
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        X = X.merge(self.claim_features_, on="CUST_ID", how="left")
+        new_cols = [c for c in self.claim_features_.columns if c != "CUST_ID"]
+        X[new_cols] = X[new_cols].fillna(0)
+        return X
+
+
+class RatioFeature:
+    """비율 및 정규화 특성 (v3 신규)"""
+
+    def __init__(self):
+        self.claim_features_ = None
+
+    def fit(self, X: pd.DataFrame, y=None, claim_df: pd.DataFrame = None):
+        if claim_df is None:
+            raise ValueError("RatioFeature 는 claim_df가 필요합니다.")
+        self.claim_features_ = self._build_features(claim_df, X)
+        return self
+
+    def _build_features(self, claim_df: pd.DataFrame, cust_df: pd.DataFrame) -> pd.DataFrame:
+        df_claim = claim_df.copy()
+        grp = df_claim.groupby('CUST_ID')
+        ratio_df = pd.DataFrame({'CUST_ID': df_claim['CUST_ID'].unique()})
+
+        # 고객 데이터와 조인 (연령, 직업 정보 필요)
+        if 'AGE' in cust_df.columns and 'OCCP_GRP_1' in cust_df.columns and 'DMND_AMT' in df_claim.columns:
+            # 고객별 평균 청구금액
+            cust_avg_dmnd = grp['DMND_AMT'].mean().reset_index(name='cust_avg_dmnd')
+            ratio_df = ratio_df.merge(cust_avg_dmnd, on='CUST_ID', how='left')
+
+            # 연령대×직업 그룹별 평균 계산을 위해 고객 정보 병합
+            ratio_df = ratio_df.merge(cust_df[['CUST_ID', 'AGE', 'OCCP_GRP_1']], on='CUST_ID', how='left')
+
+            # 연령대 생성 (10년 단위)
+            ratio_df['AGE_GROUP'] = (ratio_df['AGE'] // 10) * 10
+
+            # 연령대×직업 그룹별 평균
+            peer_avg = ratio_df.groupby(['AGE_GROUP', 'OCCP_GRP_1'])['cust_avg_dmnd'].transform('mean')
+            ratio_df['RATIO_DMND_VS_PEER'] = ratio_df['cust_avg_dmnd'] / peer_avg.replace(0, 1)
+
+            # 임시 컬럼 제거
+            ratio_df = ratio_df.drop(columns=['AGE', 'OCCP_GRP_1', 'AGE_GROUP', 'cust_avg_dmnd'])
+
+        # 최대/평균 비율
+        if 'DMND_AMT' in df_claim.columns:
+            dmnd_stats = grp['DMND_AMT'].agg(['mean', 'max']).reset_index()
+            dmnd_stats['RATIO_DMND_MAX_MEAN'] = dmnd_stats['max'] / dmnd_stats['mean'].replace(0, 1)
+            ratio_df = ratio_df.merge(dmnd_stats[['CUST_ID', 'RATIO_DMND_MAX_MEAN']], on='CUST_ID', how='left')
+
+        # 집중도 지수 (상위 20% 청구가 전체에서 차지하는 비율)
+        if 'DMND_AMT' in df_claim.columns:
+            def concentration_index(series):
+                if len(series) == 0:
+                    return 0
+                sorted_series = series.sort_values(ascending=False)
+                top_20_count = max(1, len(series) // 5)
+                top_20_sum = sorted_series.head(top_20_count).sum()
+                total_sum = series.sum()
+                return top_20_sum / total_sum if total_sum > 0 else 0
+
+            concentration = grp['DMND_AMT'].apply(concentration_index).reset_index(name='RATIO_CONCENTRATION_INDEX')
+            ratio_df = ratio_df.merge(concentration, on='CUST_ID', how='left')
+
+        ratio_df = ratio_df.fillna(0)
+        return ratio_df
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        X = X.merge(self.claim_features_, on="CUST_ID", how="left")
+        new_cols = [c for c in self.claim_features_.columns if c != "CUST_ID"]
+        X[new_cols] = X[new_cols].fillna(0)
+        return X
+
+
+class TemporalDecayFeature:
+    """시간 감쇠 가중 특성 (v3 신규)"""
+
+    def __init__(self, decay_rates=None):
+        self.decay_rates = decay_rates or [0.01, 0.05, 0.1]
+        self.claim_features_ = None
+
+    def fit(self, X: pd.DataFrame, y=None, claim_df: pd.DataFrame = None):
+        if claim_df is None:
+            raise ValueError("TemporalDecayFeature 는 claim_df가 필요합니다.")
+        self.claim_features_ = self._build_features(claim_df)
+        return self
+
+    def _build_features(self, claim_df: pd.DataFrame) -> pd.DataFrame:
+        df_claim = claim_df.copy()
+
+        if 'RECP_DATE' not in df_claim.columns or 'DMND_AMT' not in df_claim.columns:
+            return pd.DataFrame({'CUST_ID': claim_df['CUST_ID'].unique()})
+
+        df_claim['RECP_DATE'] = pd.to_datetime(df_claim['RECP_DATE'], errors='coerce')
+        df_claim = df_claim.dropna(subset=['RECP_DATE', 'DMND_AMT'])
+        df_claim = df_claim.sort_values(['CUST_ID', 'RECP_DATE'])
+
+        grp = df_claim.groupby('CUST_ID')
+        temporal_df = pd.DataFrame({'CUST_ID': df_claim['CUST_ID'].unique()})
+
+        # 지수 감쇠 가중 청구금액
+        for decay_rate in self.decay_rates:
+            def exponential_decay_weighted(group):
+                if len(group) == 0:
+                    return 0
+                max_date = group['RECP_DATE'].max()
+                days_ago = (max_date - group['RECP_DATE']).dt.days
+                weights = np.exp(-decay_rate * days_ago)
+                weighted_sum = (group['DMND_AMT'] * weights).sum()
+                return weighted_sum / weights.sum() if weights.sum() > 0 else 0
+
+            decay_feature = grp.apply(exponential_decay_weighted).reset_index(name=f'TEMP_DECAY_{int(decay_rate*100):02d}_DMND')
+            temporal_df = temporal_df.merge(decay_feature, on='CUST_ID', how='left')
+
+        # 최근 6개월 vs 이전 차이
+        if len(df_claim) > 0:
+            max_date = df_claim['RECP_DATE'].max()
+            df_claim['IS_RECENT_6M'] = df_claim['RECP_DATE'] >= max_date - pd.Timedelta(days=180)
+
+            recent_avg = df_claim[df_claim['IS_RECENT_6M']].groupby('CUST_ID')['DMND_AMT'].mean().reset_index(name='recent_avg')
+            old_avg = df_claim[~df_claim['IS_RECENT_6M']].groupby('CUST_ID')['DMND_AMT'].mean().reset_index(name='old_avg')
+
+            temporal_df = temporal_df.merge(recent_avg, on='CUST_ID', how='left')
+            temporal_df = temporal_df.merge(old_avg, on='CUST_ID', how='left')
+
+            temporal_df['TEMP_RECENT_VS_OLD_DIFF'] = temporal_df['recent_avg'] - temporal_df['old_avg']
+            temporal_df = temporal_df.drop(columns=['recent_avg', 'old_avg'])
+
+        temporal_df = temporal_df.fillna(0)
+        return temporal_df
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        X = X.merge(self.claim_features_, on="CUST_ID", how="left")
+        new_cols = [c for c in self.claim_features_.columns if c != "CUST_ID"]
+        X[new_cols] = X[new_cols].fillna(0)
+        return X
