@@ -72,3 +72,50 @@ class LabelEncoder:
             if col in X.columns:
                 X[col] = X[col].astype(str).map(mapping).fillna(-1).astype(int)
         return X
+
+
+class FrequencyEncoder:
+    """범주형 변수를 출현 빈도로 인코딩 (고카디널리티 변수에 유용)"""
+
+    def __init__(self, cols=None):
+        self.cols = cols if cols else CAT_COLS
+        self.frequency_map_ = {}
+
+    def fit(self, X: pd.DataFrame, y=None):
+        for col in self.cols:
+            if col in X.columns:
+                freq = X[col].value_counts().to_dict()
+                self.frequency_map_[col] = freq
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        for col, freq_map in self.frequency_map_.items():
+            if col in X.columns:
+                new_col_name = f"{col}_FREQ"
+                X[new_col_name] = X[col].map(freq_map).fillna(0)
+        return X
+
+
+class RarityEncoder:
+    """범주형 변수를 희귀도로 인코딩 (희귀한 값일수록 높은 점수)"""
+
+    def __init__(self, cols=None):
+        self.cols = cols if cols else CAT_COLS
+        self.rarity_map_ = {}
+
+    def fit(self, X: pd.DataFrame, y=None):
+        for col in self.cols:
+            if col in X.columns:
+                freq = X[col].value_counts()
+                rarity = (1 / (freq + 1)).to_dict()
+                self.rarity_map_[col] = rarity
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        for col, rarity_map in self.rarity_map_.items():
+            if col in X.columns:
+                new_col_name = f"{col}_RARITY"
+                X[new_col_name] = X[col].map(rarity_map).fillna(1.0)
+        return X
