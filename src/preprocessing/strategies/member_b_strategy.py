@@ -4,7 +4,7 @@ from src.preprocessing.components.missing_value import MedianImputer
 from src.preprocessing.components.outlier import QuantileCapper
 from src.preprocessing.components.encoder import TargetEncoder
 from src.preprocessing.components.scaler import RobustScalerWrapper
-from src.preprocessing.components.feature_engineer import (
+from src.preprocessing.components.features.member_b_features import (
     DeviationFeature,
     BurstFeature,
     GraphFeature,
