@@ -38,14 +38,14 @@ class OneHotEncoder:
 
     def fit(self, X: pd.DataFrame, y=None):
         cols = [c for c in self.cols if c in X.columns]
-        dummies = pd.get_dummies(X[cols], columns=cols, drop_first=False)
+        dummies = pd.get_dummies(X[cols], columns=cols, drop_first=False, dtype=int)
         self.dummy_cols_ = dummies.columns.tolist()
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         X = X.copy()
         cols = [c for c in self.cols if c in X.columns]
-        dummies = pd.get_dummies(X[cols], columns=cols, drop_first=False)
+        dummies = pd.get_dummies(X[cols], columns=cols, drop_first=False, dtype=int)
         dummies = dummies.reindex(columns=self.dummy_cols_, fill_value=0)
         X = X.drop(columns=cols)
         X = pd.concat([X, dummies], axis=1)
