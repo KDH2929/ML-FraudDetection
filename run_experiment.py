@@ -1,23 +1,57 @@
 import argparse
-from src.experiment.experiment_runner import run, run_all
+
+from src.experiment.experiment_runner import (
+    MODEL_OPTIONS,
+    STRATEGIES,
+    run,
+    run_all,
+)
+from src.preprocessing.processed_data import ensure_processed_csv, ensure_processed_csvs
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="보험 사기자 탐지 실험 실행")
-    parser.add_argument("--member", type=str, choices=["member_a", "member_b", "member_c"],
-                        help="특정 멤버만 실행")
-    parser.add_argument("--model", type=str, default="lgbm", choices=["lgbm", "rf", "logistic"],
-                        help="사용할 모델 (기본: lgbm)")
-    parser.add_argument("--sampler", type=str, default="smote",
-                        help="오버샘플러 방법: smote, adasyn, borderlinesmote, none (기본: smote)")
-    parser.add_argument("--selector", type=str, default=None,
-                        help="피처 선택 방법: variance, model, none (기본: none)")
-    parser.add_argument("--all", action="store_true",
-                        help="전체 멤버 비교 실험 실행")
+    parser = argparse.ArgumentParser(description="보험사기 실험 실행기")
+    parser.add_argument("--member", type=str, choices=STRATEGIES, help="실행할 전략 ID 1개")
+    parser.add_argument("--strategy", type=str, choices=STRATEGIES, help="실행할 전략 ID 1개")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="lgbm",
+        choices=MODEL_OPTIONS + ["all"],
+        help="실행할 모델 또는 'all'",
+    )
+    parser.add_argument("--all", action="store_true", help="구현된 모든 전략 실행")
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help="전처리 CSV만 만들고 실험은 실행하지 않음",
+    )
+    parser.add_argument(
+        "--force-preprocess",
+        action="store_true",
+        help="이미 CSV가 있어도 전처리를 다시 실행함",
+    )
     args = parser.parse_args()
 
-    if args.all:
-        run_all(model_name=args.model, sampler_method=args.sampler, selector_method=args.selector)
-    elif args.member:
-        run(args.member, model_name=args.model, sampler_method=args.sampler, selector_method=args.selector)
+    target_strategy = args.strategy or args.member
+
+    if args.prepare_only:
+        if args.all:
+            ensure_processed_csvs(force=args.force_preprocess)
+        elif target_strategy:
+            ensure_processed_csv(target_strategy, force=args.force_preprocess)
+        else:
+            parser.error("--prepare-only 는 --strategy/--member 또는 --all 과 함께 사용해야 합니다.")
+    elif args.all:
+        run_all(
+            model_name=args.model,
+            force_preprocess=args.force_preprocess,
+        )
+    elif target_strategy:
+        run(
+            target_strategy,
+            model_name=args.model,
+            force_preprocess=args.force_preprocess,
+        )
     else:
         parser.print_help()
