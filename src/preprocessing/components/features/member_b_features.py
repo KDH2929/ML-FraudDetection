@@ -1115,7 +1115,7 @@ class SequenceFeature:
         sequence_df = sequence_df.merge(dmnd_slope, on='CUST_ID', how='left')
 
         # 2. 청구 간격 가속도 (간격이 점점 짧아지는지)
-        df_claim['CLAIM_INTERVAL'] = grp['RECP_DATE'].diff().dt.days
+        df_claim['CLAIM_INTERVAL'] = df_claim.groupby('CUST_ID')['RECP_DATE'].diff().dt.days
 
         def calculate_interval_slope(group):
             intervals = group['CLAIM_INTERVAL'].dropna()
@@ -1127,7 +1127,7 @@ class SequenceFeature:
                 return 0
             return np.polyfit(x, y, 1)[0]
 
-        interval_slope = grp.apply(calculate_interval_slope).reset_index(name='SEQ_INTERVAL_ACCEL')
+        interval_slope = df_claim.groupby('CUST_ID').apply(calculate_interval_slope).reset_index(name='SEQ_INTERVAL_ACCEL')
         sequence_df = sequence_df.merge(interval_slope, on='CUST_ID', how='left')
 
         # 3. 최근 집중도 (최근 3개월 청구 비율)
@@ -1135,7 +1135,7 @@ class SequenceFeature:
             max_date = df_claim['RECP_DATE'].max()
             df_claim['IS_RECENT_3M'] = (df_claim['RECP_DATE'] >= max_date - pd.Timedelta(days=90)).astype(int)
 
-            recent_ratio = grp['IS_RECENT_3M'].mean().reset_index(name='SEQ_RECENT_3M_RATIO')
+            recent_ratio = df_claim.groupby('CUST_ID')['IS_RECENT_3M'].mean().reset_index(name='SEQ_RECENT_3M_RATIO')
             sequence_df = sequence_df.merge(recent_ratio, on='CUST_ID', how='left')
 
         sequence_df = sequence_df.fillna(0)
