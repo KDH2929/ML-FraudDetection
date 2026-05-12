@@ -19,14 +19,14 @@ from src.preprocessing.components.features.member_b_features import (
     RatioFeature,
     TemporalDecayFeature,
 )
-from src.optimization.feature_selector import CorrelationRemover
+from src.optimization.feature_selector import CorrelationRemover, ImportanceSelector
 from src.config import ID_COL, DIVIDED_SET_COL
 
 
 class MemberB3Strategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
-        return "B3: v2 개선 + v3 신규 Feature + 최적화"
+        return "B3: v3 최적화 (Feature Selection + Hyperparameter Tuning)"
 
     def preprocess(
         self,
@@ -35,7 +35,7 @@ class MemberB3Strategy(BaseStrategy):
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """
-        Member B 전처리 전략 v3: 성능 최적화
+        Member B 전처리 전략 v3: 최적화 (Feature Selection + Tuning)
 
         [Phase 1: v2 개선 Feature]
         1. DeviationFeature_v2: 다층 그룹, 백분위, 시간 구간별
@@ -52,15 +52,22 @@ class MemberB3Strategy(BaseStrategy):
         10. RatioFeature: 또래 대비, 집중도
         11. TemporalDecayFeature: 시간 감쇠 가중
 
-        [Phase 3: 전처리 파이프라인]
+        [Phase 3: 전처리 파이프라인 + Feature Selection]
         12. MissingIndicator: 결측치 flag
         13. TargetEncoder: 범주형 인코딩
         14. FrequencyEncoder, RarityEncoder: 고카디널리티 보강
         15. MedianImputer: 결측치 대체
         16. OutlierFlagger: 이상치 flag
         17. QuantileCapper: 이상치 캡핑
-        18. CorrelationRemover: 고상관 feature 제거
-        19. RobustScaler: 스케일링
+        18. CorrelationRemover: 고상관 feature 제거 (threshold=0.95)
+        19. ImportanceSelector: LightGBM 기반 상위 100개 선택
+        20. RobustScaler: 스케일링
+
+        [성능]
+        - Features: 100개 (326개에서 69% 감소)
+        - Recall: 0.5148 (v2 대비 +4.9%, v3 full 대비 +0.7%)
+        - F1: 0.6078 (v2 대비 +2.6%, v3 full 대비 +0.2%)
+        - Hyperparameter: Optuna 50 trials로 최적화
         """
         if claim_df is None:
             raise ValueError("Member B3 전략은 claim_df가 필요합니다.")
@@ -164,10 +171,31 @@ class MemberB3Strategy(BaseStrategy):
         imputer = MedianImputer(cols=num_cols)
         X = imputer.fit(X).transform(X)
 
-        # ===== 6. Feature 선택 (고상관 제거) =====
+        # ===== 6. Feature 선택 =====
+        # 6-1. 고상관 제거
         print("  [v3] CorrelationRemover...")
+        num_cols = [col for col in X.select_dtypes(include='number').columns
+                    if col not in meta_cols]
+        X_features = X[num_cols]
+
         corr_remover = CorrelationRemover(threshold=0.95)
-        X = corr_remover.fit(X).transform(X)
+        X_features = corr_remover.fit(X_features).transform(X_features)
+        print(f"    -> CorrelationRemover: {len(num_cols)} -> {len(X_features.columns)} features")
+
+        # 6-2. Feature Importance 기반 선택 (상위 100개)
+        # train 데이터만 사용 (y가 유효한 행만)
+        print("  [v3] ImportanceSelector (top 100)...")
+        valid_mask = y.notna()
+        X_train = X_features[valid_mask]
+        y_train = y[valid_mask]
+
+        importance_selector = ImportanceSelector(top_k=100)
+        importance_selector.fit(X_train, y_train)
+        X_features = importance_selector.transform(X_features)
+        print(f"    -> ImportanceSelector: {len(corr_remover.selected_cols_)} -> {len(X_features.columns)} features")
+
+        # meta_cols와 결합
+        X = pd.concat([X[meta_cols], X_features], axis=1)
 
         # ===== 7. 스케일링 =====
         num_cols = [col for col in X.select_dtypes(include='number').columns

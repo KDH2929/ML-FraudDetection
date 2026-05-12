@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.feature_selection import SelectFromModel, VarianceThreshold
 from sklearn.ensemble import RandomForestClassifier
+import lightgbm as lgb
 from src.config import RANDOM_STATE
 
 
@@ -96,6 +97,60 @@ class VIFRemover:
             selected.remove(feature_to_remove)
 
         self.selected_cols_ = selected
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        return X[self.selected_cols_]
+
+
+class ImportanceSelector:
+    """LightGBM Feature Importance 기반 선택기"""
+
+    def __init__(self, top_k=None, threshold=None, n_estimators=100):
+        """
+        Args:
+            top_k: 상위 k개 feature 선택 (우선순위 높음)
+            threshold: 누적 중요도 threshold (0~1) - top_k가 None일 때만 사용
+            n_estimators: LightGBM 트리 개수
+        """
+        self.top_k = top_k
+        self.threshold = threshold
+        self.n_estimators = n_estimators
+        self.selected_cols_ = None
+        self.importance_df_ = None
+
+    def fit(self, X: pd.DataFrame, y):
+        # LightGBM 학습
+        model = lgb.LGBMClassifier(
+            n_estimators=self.n_estimators,
+            random_state=RANDOM_STATE,
+            verbose=-1,
+            n_jobs=-1
+        )
+        model.fit(X, y)
+
+        # Feature Importance 추출
+        importance = model.feature_importances_
+        self.importance_df_ = pd.DataFrame({
+            'feature': X.columns,
+            'importance': importance
+        }).sort_values('importance', ascending=False)
+
+        # Feature 선택
+        if self.top_k is not None:
+            # 상위 k개 선택
+            self.selected_cols_ = self.importance_df_.head(self.top_k)['feature'].tolist()
+        elif self.threshold is not None:
+            # 누적 중요도 기준 선택
+            self.importance_df_['cumsum'] = self.importance_df_['importance'].cumsum() / self.importance_df_['importance'].sum()
+            self.selected_cols_ = self.importance_df_[self.importance_df_['cumsum'] <= self.threshold]['feature'].tolist()
+            # 최소 1개는 선택
+            if len(self.selected_cols_) == 0:
+                self.selected_cols_ = [self.importance_df_.iloc[0]['feature']]
+        else:
+            # 둘 다 없으면 모두 선택
+            self.selected_cols_ = X.columns.tolist()
+
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
