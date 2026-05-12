@@ -79,7 +79,7 @@ class MemberCStrategy(BaseStrategy):
         numeric_cols = [
             col
             for col in cust.columns
-            if col not in {"CUST_ID", "DIVIDED_SET"}
+            if col not in {"CUST_ID", "DIVIDED_SET", "FP_CAREER", "fp_career_flag"}
             and pd.api.types.is_numeric_dtype(cust[col])
         ]
         median_imputer = MedianImputer(cols=numeric_cols)
@@ -108,6 +108,14 @@ class MemberCStrategy(BaseStrategy):
         non_numeric_cols = cust.select_dtypes(exclude="number").columns.tolist()
         if non_numeric_cols:
             cust = cust.drop(columns=non_numeric_cols)
+
+        # 학습/검증 split 은 DIVIDED_SET 과 무관하게 수행하고, FP_CAREER 는 분석에서 제외한다.
+        cust = cust.drop(
+            columns=self._existing_columns(
+                cust, ["DIVIDED_SET", "FP_CAREER", "fp_career_flag"]
+            ),
+            errors="ignore",
+        )
 
         return cust
 
@@ -154,10 +162,6 @@ class MemberCStrategy(BaseStrategy):
         ]
         for col in self._existing_columns(cust, categorical_fill_cols):
             cust[col] = cust[col].astype("string").fillna("Unknown")
-
-        # FP_CAREER는 Y/N 성격이라 별도 flag로 단순화하는 편이 해석과 안정성에 유리하다.
-        if "FP_CAREER" in cust.columns:
-            cust["fp_career_flag"] = cust["FP_CAREER"].astype("string").str.upper().eq("Y").astype(int)
 
         # 연속형 나이는 그대로도 쓰되, 생애주기 성격을 보강하기 위해 그룹 변수도 함께 만든다.
         if "AGE" in cust.columns:
