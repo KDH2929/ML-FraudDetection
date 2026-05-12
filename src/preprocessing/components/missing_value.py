@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+from sklearn.impute import KNNImputer
+from sklearn.experimental import enable_iterative_imputer  # noqa
+from sklearn.impute import IterativeImputer
 
 
 class GroupMeanImputer:
@@ -81,4 +84,71 @@ class ZeroImputer:
         for col in cols:
             if col in X.columns:
                 X[col] = X[col].fillna(0)
+        return X
+
+
+class MissingIndicator:
+    """결측치 여부를 binary feature로 추가"""
+
+    def __init__(self, cols=None):
+        self.cols = cols
+        self.missing_cols_ = []
+
+    def fit(self, X: pd.DataFrame, y=None):
+        cols = self.cols if self.cols else X.columns.tolist()
+        self.missing_cols_ = [col for col in cols if col in X.columns and X[col].isna().any()]
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        for col in self.missing_cols_:
+            if col in X.columns:
+                X[f"IS_MISSING_{col}"] = X[col].isna().astype(int)
+        return X
+
+
+class KNNImputerWrapper:
+    """KNN 기반 결측치 대체 (scikit-learn KNNImputer 래퍼)"""
+
+    def __init__(self, cols=None, n_neighbors=5):
+        self.cols = cols
+        self.n_neighbors = n_neighbors
+        self.imputer_ = None
+        self.feature_names_ = None
+
+    def fit(self, X: pd.DataFrame, y=None):
+        cols = self.cols if self.cols else X.select_dtypes(include="number").columns.tolist()
+        self.feature_names_ = cols
+        self.imputer_ = KNNImputer(n_neighbors=self.n_neighbors)
+        self.imputer_.fit(X[cols])
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        if self.feature_names_:
+            X[self.feature_names_] = self.imputer_.transform(X[self.feature_names_])
+        return X
+
+
+class IterativeImputerWrapper:
+    """반복적 회귀 기반 결측치 대체 (scikit-learn IterativeImputer 래퍼)"""
+
+    def __init__(self, cols=None, max_iter=10, random_state=42):
+        self.cols = cols
+        self.max_iter = max_iter
+        self.random_state = random_state
+        self.imputer_ = None
+        self.feature_names_ = None
+
+    def fit(self, X: pd.DataFrame, y=None):
+        cols = self.cols if self.cols else X.select_dtypes(include="number").columns.tolist()
+        self.feature_names_ = cols
+        self.imputer_ = IterativeImputer(max_iter=self.max_iter, random_state=self.random_state)
+        self.imputer_.fit(X[cols])
+        return self
+
+    def transform(self, X: pd.DataFrame) -> pd.DataFrame:
+        X = X.copy()
+        if self.feature_names_:
+            X[self.feature_names_] = self.imputer_.transform(X[self.feature_names_])
         return X
