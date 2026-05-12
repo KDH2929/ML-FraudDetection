@@ -63,10 +63,18 @@ def list_strategies():
     return list(STRATEGY_REGISTRY.keys())
 
 
-def get_strategy(strategy_id: str) -> BaseStrategy:
+def get_strategy(strategy_id: str, **kwargs) -> BaseStrategy:
     key = strategy_id.lower()
     if key not in STRATEGY_REGISTRY:
         raise ValueError(
             f"알 수 없는 전략입니다: {strategy_id}. 사용 가능: {list(STRATEGY_REGISTRY.keys())}"
         )
-    return STRATEGY_REGISTRY[key]()
+    cls = STRATEGY_REGISTRY[key]
+    if not kwargs:
+        return cls()
+    try:
+        return cls(**kwargs)
+    except TypeError as e:
+        raise TypeError(
+            f"전략 {strategy_id} 생성자가 인자를 받지 않거나 지원하지 않는 인자입니다: {kwargs}"
+        ) from e

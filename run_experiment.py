@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import sys
 
 from src.experiment.experiment_runner import (
     MODEL_OPTIONS,
@@ -70,7 +71,7 @@ if __name__ == "__main__":
             print("\n" + "=" * 80)
             print("최적화 보고서 생성 중...")
             print("=" * 80)
-            cmd = ["python", "generate_report.py", "--strategy", target_strategy]
+            cmd = [sys.executable, "generate_report.py", "--strategy", target_strategy]
             if args.baseline:
                 cmd.extend(["--baseline", args.baseline])
             subprocess.run(cmd)
