@@ -12,7 +12,7 @@ from src.utils import metrics, save_load
 
 
 STRATEGIES = list_strategies()
-MODEL_OPTIONS = ["lgbm", "rf", "logistic"]
+MODEL_OPTIONS = ["lgbm", "rf", "logistic", "xgboost", "catboost", "voting", "stacking"]
 
 
 def _resolve_models(model_name="lgbm"):
