@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 
 from src.config import DIVIDED_SET_COL, ID_COL
 from src.pipeline.data_loader import normalize_target
+from src.project_paths import processed_csv_path
 from src.preprocessing.components.encoder import OneHotEncoder
 from src.preprocessing.components.missing_value import MedianImputer, ZeroImputer
 from src.preprocessing.components.outlier import QuantileCapper
@@ -296,7 +297,7 @@ class MemberCV3FeaturePipeline:
         pos_cnt = int((y_train == 1).sum())
         neg_cnt = int((y_train == 0).sum())
         report["imbalance_ratio"] = round(float(neg_cnt / pos_cnt), 4) if pos_cnt else None
-        report["final_save_file_name"] = f"{strategy.__class__.__module__.split('.')[-1]}_preprocessed.csv"
+        report["final_save_file_name"] = processed_csv_path(strategy.get_strategy_name()).name
 
         strategy._print_report(report)
         return merged
@@ -304,4 +305,3 @@ class MemberCV3FeaturePipeline:
 
 class MemberCV4FeaturePipeline(MemberCV3FeaturePipeline):
     """member_c v4 전략도 v3와 같은 전처리 흐름을 사용한다."""
-

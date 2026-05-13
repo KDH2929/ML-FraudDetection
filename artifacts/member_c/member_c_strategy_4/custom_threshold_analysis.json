@@ -1,0 +1,35 @@
+{
+  "strategy_id": "member_c_strategy_4",
+  "mode": "custom_separated_threshold",
+  "best_threshold": 0.4642899201825889,
+  "baseline_default": {
+    "recall": 0.5645756457564576,
+    "f1": 0.6566523605150214,
+    "f1_macro": 0.8143328271002603,
+    "precision": 0.7846153846153846
+  },
+  "tuned_default_threshold_0_5": {
+    "recall": 0.6642066420664207,
+    "f1": 0.6722689075630253,
+    "f1_macro": 0.820596605175935,
+    "precision": 0.6805293005671077
+  },
+  "tuned_best_threshold": {
+    "recall": 0.6826568265682657,
+    "f1": 0.6795224977043158,
+    "f1_macro": 0.8242872752776257,
+    "precision": 0.676416819012797
+  },
+  "improvement_vs_baseline": {
+    "recall": 0.11808118081180807,
+    "f1": 0.022870137189294426,
+    "f1_macro": 0.00995444817736535,
+    "precision": -0.10819856560258756
+  },
+  "improvement_vs_tuned_default": {
+    "recall": 0.01845018450184499,
+    "f1": 0.007253590141290567,
+    "f1_macro": 0.003690670101690663,
+    "precision": -0.004112481554310654
+  }
+}

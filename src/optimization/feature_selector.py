@@ -1,13 +1,13 @@
-import pandas as pd
 import numpy as np
-from sklearn.feature_selection import SelectFromModel, VarianceThreshold
+import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-import lightgbm as lgb
+from sklearn.feature_selection import SelectFromModel, VarianceThreshold
+
 from src.config import RANDOM_STATE
 
 
 class FeatureSelector:
-    """불필요한 변수를 제거해 모델 성능을 향상시킨다."""
+    """Remove weak features before model training."""
 
     def __init__(self, method: str = None):
         self.method = method
@@ -36,9 +36,9 @@ class FeatureSelector:
 
 
 class CorrelationRemover:
-    """상관관계가 높은 feature 쌍 중 하나를 제거"""
+    """Remove one feature from each highly correlated pair."""
 
-    def __init__(self, threshold=0.95, method='pearson'):
+    def __init__(self, threshold=0.95, method="pearson"):
         self.threshold = threshold
         self.method = method
         self.selected_cols_ = None
@@ -58,7 +58,7 @@ class CorrelationRemover:
 
 
 class VIFRemover:
-    """VIF(Variance Inflation Factor)가 높은 feature를 제거 (다중공선성 제거)"""
+    """Remove features with high variance inflation factor."""
 
     def __init__(self, threshold=10.0, max_iter=10):
         self.threshold = threshold
@@ -69,11 +69,10 @@ class VIFRemover:
         try:
             from statsmodels.stats.outliers_influence import variance_inflation_factor
         except ImportError:
-            # statsmodels가 없으면 모든 feature 유지
             self.selected_cols_ = X.columns.tolist()
             return self
 
-        features = X.select_dtypes(include='number').columns.tolist()
+        features = X.select_dtypes(include="number").columns.tolist()
         selected = features.copy()
 
         for _ in range(self.max_iter):
@@ -92,7 +91,6 @@ class VIFRemover:
             if max_vif <= self.threshold:
                 break
 
-            # VIF가 가장 높은 feature 제거
             feature_to_remove = vif_data.loc[vif_data["VIF"].idxmax(), "feature"]
             selected.remove(feature_to_remove)
 
@@ -104,15 +102,9 @@ class VIFRemover:
 
 
 class ImportanceSelector:
-    """LightGBM Feature Importance 기반 선택기"""
+    """Select features using LightGBM feature importance."""
 
     def __init__(self, top_k=None, threshold=None, n_estimators=100):
-        """
-        Args:
-            top_k: 상위 k개 feature 선택 (우선순위 높음)
-            threshold: 누적 중요도 threshold (0~1) - top_k가 None일 때만 사용
-            n_estimators: LightGBM 트리 개수
-        """
         self.top_k = top_k
         self.threshold = threshold
         self.n_estimators = n_estimators
@@ -120,35 +112,36 @@ class ImportanceSelector:
         self.importance_df_ = None
 
     def fit(self, X: pd.DataFrame, y):
-        # LightGBM 학습
+        import lightgbm as lgb
+
         model = lgb.LGBMClassifier(
             n_estimators=self.n_estimators,
             random_state=RANDOM_STATE,
             verbose=-1,
-            n_jobs=-1
+            n_jobs=-1,
         )
         model.fit(X, y)
 
-        # Feature Importance 추출
         importance = model.feature_importances_
-        self.importance_df_ = pd.DataFrame({
-            'feature': X.columns,
-            'importance': importance
-        }).sort_values('importance', ascending=False)
+        self.importance_df_ = pd.DataFrame(
+            {
+                "feature": X.columns,
+                "importance": importance,
+            }
+        ).sort_values("importance", ascending=False)
 
-        # Feature 선택
         if self.top_k is not None:
-            # 상위 k개 선택
-            self.selected_cols_ = self.importance_df_.head(self.top_k)['feature'].tolist()
+            self.selected_cols_ = self.importance_df_.head(self.top_k)["feature"].tolist()
         elif self.threshold is not None:
-            # 누적 중요도 기준 선택
-            self.importance_df_['cumsum'] = self.importance_df_['importance'].cumsum() / self.importance_df_['importance'].sum()
-            self.selected_cols_ = self.importance_df_[self.importance_df_['cumsum'] <= self.threshold]['feature'].tolist()
-            # 최소 1개는 선택
+            self.importance_df_["cumsum"] = (
+                self.importance_df_["importance"].cumsum() / self.importance_df_["importance"].sum()
+            )
+            self.selected_cols_ = self.importance_df_[
+                self.importance_df_["cumsum"] <= self.threshold
+            ]["feature"].tolist()
             if len(self.selected_cols_) == 0:
-                self.selected_cols_ = [self.importance_df_.iloc[0]['feature']]
+                self.selected_cols_ = [self.importance_df_.iloc[0]["feature"]]
         else:
-            # 둘 다 없으면 모두 선택
             self.selected_cols_ = X.columns.tolist()
 
         return self
