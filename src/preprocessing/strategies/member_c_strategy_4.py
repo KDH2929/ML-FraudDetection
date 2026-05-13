@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from src.config import ID_COL
+from src.preprocessing.components.features.member_c_features import MemberCV4FeaturePipeline
 from src.preprocessing.strategies.member_c_strategy_3 import MemberCStrategy3
 
 
@@ -18,6 +19,15 @@ class MemberCStrategy4(MemberCStrategy3):
     def get_strategy_name(self) -> str:
         base = super().get_strategy_name()
         return base.replace("C3", "C4")
+
+    def preprocess(
+        self,
+        X: pd.DataFrame,
+        y: pd.Series,
+        claim_df: pd.DataFrame = None,
+    ) -> pd.DataFrame:
+        pipeline = MemberCV4FeaturePipeline()
+        return pipeline.run(self, X, y, claim_df)
 
     def _prepare_claim_data(
         self,
