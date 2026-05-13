@@ -40,6 +40,32 @@ MODEL_PARAMS = {
         "random_state": RANDOM_STATE,
         "n_jobs": -1,
     },
+    "xgboost": {
+        "n_estimators": 500,
+        "learning_rate": 0.05,
+        "max_depth": 7,
+        "random_state": RANDOM_STATE,
+        "n_jobs": -1,
+        "verbosity": 0,
+    },
+    "catboost": {
+        "iterations": 500,
+        "learning_rate": 0.05,
+        "depth": 7,
+        "random_state": RANDOM_STATE,
+        "thread_count": -1,
+        "verbose": False,
+    },
+    # Voting: LightGBM + XGBoost + CatBoost (soft voting)
+    "voting": {
+        "voting": "soft",
+        "n_jobs": -1,
+    },
+    # Stacking: LightGBM + XGBoost + CatBoost (meta: Logistic)
+    "stacking": {
+        "n_jobs": -1,
+        "cv": 5,
+    },
 }
 
 # 전략별 최적 threshold (F1 maximization)
