@@ -47,7 +47,9 @@ def load_and_split(processed_csv: str):
     labeled_mask = y.notna()
     if DIVIDED_SET_COL in df.columns:
         # 평가용 unlabeled 데이터는 제외하고 학습 대상만 사용한다.
-        labeled_mask &= df[DIVIDED_SET_COL].astype("string").str.strip() == "1"
+        # CSV에서 1.0 등으로 읽히면 문자열 "1" 비교와 어긋나 0행이 될 수 있어 숫자 비교로 통일한다.
+        ds = pd.to_numeric(df[DIVIDED_SET_COL], errors="coerce")
+        labeled_mask &= ds == 1
 
     df = df.loc[labeled_mask].copy()
     y = y.loc[labeled_mask].astype(int)
