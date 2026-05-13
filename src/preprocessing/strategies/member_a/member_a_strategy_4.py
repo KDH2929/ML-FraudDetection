@@ -8,7 +8,7 @@ Member A 전처리 v4 — v3 위에 논문(paper) 계열 파생을 얹은 확장
   - `book_survey_paper_strategy`: `_paper_survey_block` + `BookSurveyPaperStrategy` 와 동일한 `paper_meta`·`peer_frame`·
     `GroupMeanImputer` 이후 `_paper_survey_customer_addons` (`paper_prem_incm_ratio`, `paper_incm_missing_or_zero`).
 
-튜닝: `python -m src.optimization.hyperparameter_tuner --strategy member_a_strategy_4` — **paper_* 다중공선성 축소 실험은 `member_a_strategy_5`**.
+튜닝: `python -m src.optimization.hyperparameter_tuner --strategy member_a_strategy_4`
 
 실험 CLI ID: member_a_strategy_4
 """

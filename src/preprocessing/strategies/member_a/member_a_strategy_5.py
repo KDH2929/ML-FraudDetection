@@ -1,4 +1,6 @@
 """
+[DEPRECATED · 미사용] 팀 기준 Member A 논문 파생 정리는 **member_a_strategy_4 (A4)** 만 사용한다.
+
 Member A 전처리 v5 — 기본은 **A4 + `paper_*` 다중공선성 드롭만** (지표가 잘 나오는 얇은 확장).
 
 선택적으로 `advanced_feature_selection=True` 를 주면, A4+dedup 뒤에
