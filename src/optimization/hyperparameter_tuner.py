@@ -9,7 +9,7 @@ import optuna
 import pandas as pd
 from sklearn.model_selection import cross_val_score, StratifiedKFold
 
-from src.config import ARTIFACTS_DIR, RANDOM_STATE
+from src.config import ARTIFACTS_DIR, MODEL_PARAMS, RANDOM_STATE
 from src.pipeline.data_loader import load_and_split
 
 
@@ -32,6 +32,7 @@ class LGBMTuner:
             'verbosity': -1,
             'random_state': self.random_state,
             'n_jobs': -1,
+            'class_weight': 'balanced',
             # Tuning parameters
             'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3, log=True),
             'num_leaves': trial.suggest_int('num_leaves', 20, 100),
@@ -139,7 +140,8 @@ def tune_strategy(strategy_id: str, n_trials=100, output_dir=None):
 
     # Test with best parameters
     print(f"\n[Testing with best parameters]")
-    model = lgb.LGBMClassifier(**best_params, random_state=RANDOM_STATE, verbosity=-1)
+    merged = {**MODEL_PARAMS["lgbm"], **best_params}
+    model = lgb.LGBMClassifier(**merged, random_state=RANDOM_STATE, verbosity=-1)
     model.fit(train_X, train_y)
 
     from src.utils import metrics

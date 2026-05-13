@@ -95,6 +95,43 @@ def _merge_claim_features(X: pd.DataFrame, claim_df: pd.DataFrame | None) -> pd.
     return X_out
 
 
+# 보조 직업·FP 경력: A 파이프라인에서 제외(요구사항·결측/고카디널리티 정리).
+_UNUSED_CUST_FOR_A_PIPELINE = ("OCCP_GRP_2", "MATE_OCCP_GRP_2", "FP_CAREER")
+
+
+def _drop_unused_cust_columns(df: pd.DataFrame) -> pd.DataFrame:
+    drops = [c for c in _UNUSED_CUST_FOR_A_PIPELINE if c in df.columns]
+    if not drops:
+        return df
+    return df.drop(columns=drops)
+
+
+def _fill_residual_missing_for_ml(X: pd.DataFrame) -> pd.DataFrame:
+    """processed_data 검증: ID 제외 모든 열을 float로. 수치=중앙값 대치, 그 외=숫자 파싱 또는 factorize."""
+    out = X.copy()
+    skip = {ID_COL}
+    n = len(out)
+    for c in list(out.columns):
+        if c in skip:
+            continue
+        col = out[c]
+        if pd.api.types.is_numeric_dtype(col):
+            m = col.median()
+            fill = 0.0 if pd.isna(m) else float(m)
+            out[c] = pd.to_numeric(col, errors="coerce").fillna(fill)
+            continue
+        coerced = pd.to_numeric(col, errors="coerce")
+        if coerced.notna().sum() >= max(1, n // 100):
+            m = coerced.median()
+            fill = 0.0 if pd.isna(m) else float(m)
+            out[c] = coerced.fillna(fill).astype(np.float64)
+        else:
+            codes, _ = pd.factorize(col, use_na_sentinel=True)
+            s = pd.Series(codes, index=out.index, dtype=np.float64)
+            out[c] = s.mask(s < 0, 0.0)
+    return out
+
+
 class MemberAStrategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
@@ -107,6 +144,7 @@ class MemberAStrategy(BaseStrategy):
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         X_out = _merge_claim_features(X, claim_df)
+        X_out = _drop_unused_cust_columns(X_out)
 
         # --- 2) 도메인 특수값 (집값 0 = 추정 불가 → 결측으로 두고 아래에서 채움) ---
         if "RESI_COST" in X_out.columns:
@@ -166,6 +204,7 @@ class MemberAStrategy(BaseStrategy):
             sc.fit(X_out, y)
             X_out = sc.transform(X_out)
 
+        X_out = _fill_residual_missing_for_ml(X_out)
         return X_out
 
     def preprocess_train_test(
@@ -180,6 +219,8 @@ class MemberAStrategy(BaseStrategy):
         """
         tr = _merge_claim_features(X_train, claim_df)
         te = _merge_claim_features(X_test, claim_df)
+        tr = _drop_unused_cust_columns(tr)
+        te = _drop_unused_cust_columns(te)
 
         for Xs in (tr, te):
             if "RESI_COST" in Xs.columns:
@@ -239,4 +280,6 @@ class MemberAStrategy(BaseStrategy):
             te = sc.transform(te)
 
         te = te.reindex(columns=tr.columns, fill_value=0.0)
+        tr = _fill_residual_missing_for_ml(tr)
+        te = _fill_residual_missing_for_ml(te)
         return tr, te

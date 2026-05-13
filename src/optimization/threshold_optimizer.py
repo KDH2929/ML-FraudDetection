@@ -148,7 +148,13 @@ class ThresholdOptimizer:
         plt.close()
 
 
-def analyze_strategy(strategy_id: str, model_path=None, output_dir=None):
+def analyze_strategy(
+    strategy_id: str,
+    model_path=None,
+    output_dir=None,
+    *,
+    force_preprocess: bool = False,
+):
     """
     전략 성능 분석 및 threshold 최적화
 
@@ -156,17 +162,23 @@ def analyze_strategy(strategy_id: str, model_path=None, output_dir=None):
         strategy_id: 전략 ID
         model_path: 학습된 모델 경로 (None이면 tuning_results로 새로 학습)
         output_dir: 결과 저장 디렉토리
+        force_preprocess: True이면 `ensure_processed_csv` 로 CSV를 다시 생성
     """
     import lightgbm as lgb
     import json
-    from src.config import RANDOM_STATE
+    from src.config import MODEL_PARAMS, RANDOM_STATE
+    from src.preprocessing.processed_data import ensure_processed_csv
 
     if output_dir is None:
         output_dir = ARTIFACTS_DIR
 
-    # Load data
-    processed_csv = Path(f"data/processed/{strategy_id}_preprocessed.csv")
-    if not processed_csv.exists():
+    processed_path = ensure_processed_csv(strategy_id, force=force_preprocess)
+    if processed_path is None:
+        raise FileNotFoundError(
+            f"전처리 CSV를 만들 수 없습니다: {strategy_id}. 전략 구현 여부를 확인하세요."
+        )
+    processed_csv = Path(processed_path)
+    if not processed_csv.is_file():
         raise FileNotFoundError(f"Preprocessed CSV not found: {processed_csv}")
 
     print(f"Loading data: {processed_csv}")
@@ -180,10 +192,11 @@ def analyze_strategy(strategy_id: str, model_path=None, output_dir=None):
             tuning_results = json.load(f)
         best_params = tuning_results['best_params']
         print(f"Training model with best params...")
-        model = lgb.LGBMClassifier(**best_params, random_state=RANDOM_STATE, verbosity=-1)
+        merged = {**MODEL_PARAMS["lgbm"], **best_params}
+        model = lgb.LGBMClassifier(**merged, random_state=RANDOM_STATE, verbosity=-1)
     else:
         print(f"No tuning results found. Using default params...")
-        model = lgb.LGBMClassifier(random_state=RANDOM_STATE, verbosity=-1)
+        model = lgb.LGBMClassifier(**MODEL_PARAMS["lgbm"], random_state=RANDOM_STATE, verbosity=-1)
 
     model.fit(train_X, train_y)
 
@@ -281,11 +294,17 @@ if __name__ == "__main__":
     parser.add_argument("--strategy", required=True, help="Strategy ID")
     parser.add_argument("--model", default=None, help="Model path")
     parser.add_argument("--output-dir", default=None, help="Output directory")
+    parser.add_argument(
+        "--force-preprocess",
+        action="store_true",
+        help="전처리 CSV를 다시 생성한 뒤 실행 (run_experiment 와 동일)",
+    )
 
     args = parser.parse_args()
 
     analyze_strategy(
         strategy_id=args.strategy,
         model_path=args.model,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        force_preprocess=args.force_preprocess,
     )

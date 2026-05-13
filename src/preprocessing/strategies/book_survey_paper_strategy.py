@@ -215,6 +215,54 @@ def _paper_survey_block(
     return out
 
 
+def _paper_survey_customer_addons(X: pd.DataFrame) -> pd.DataFrame:
+    """
+    서베이 논문과 연계된 고객표 파생(납입/소득 비율 등). `book_pdf` CLAIM 집계와 무관.
+    `BookSurveyPaperStrategy` preprocess 의 동일 단계를 함수로 분리.
+    """
+    if ID_COL not in X.columns:
+        return pd.DataFrame()
+    out = pd.DataFrame({ID_COL: X[ID_COL]})
+    if "TOTALPREM" in X.columns and "CUST_INCM" in X.columns:
+        inc = pd.to_numeric(X["CUST_INCM"], errors="coerce").clip(lower=0)
+        prm = pd.to_numeric(X["TOTALPREM"], errors="coerce").fillna(0.0)
+        out["paper_prem_incm_ratio"] = prm / (inc + 1.0)
+        out["paper_incm_missing_or_zero"] = ((inc <= 0) | X["CUST_INCM"].isna()).astype(float)
+    else:
+        out["paper_prem_incm_ratio"] = 0.0
+        out["paper_incm_missing_or_zero"] = 0.0
+    return out
+
+
+def _paper_survey_paper_meta_from_X(X: pd.DataFrame) -> pd.DataFrame:
+    """`_paper_survey_block` 용 paper_meta (가입·관측월). 날짜 컬럼 삭제 전과 동일 스냅샷."""
+    cols = [ID_COL]
+    for c in ("CUST_RGST", "MAX_PAYM_YM"):
+        if c in X.columns:
+            cols.append(c)
+    return X[cols].drop_duplicates(subset=[ID_COL], keep="first").copy()
+
+
+def _paper_survey_peer_for_block(X: pd.DataFrame) -> pd.DataFrame:
+    """
+    `_paper_survey_block` 직전 `BookSurveyPaperStrategy` 와 동일한 peer_frame:
+    직업 앞 2글자 제거, 연령 10세 단위, DIVIDED_SET.
+    """
+    peer_cols = [ID_COL, "OCCP_GRP_1", "AGE"]
+    if DIVIDED_SET_COL in X.columns:
+        peer_cols.append(DIVIDED_SET_COL)
+    peer = X[[c for c in peer_cols if c in X.columns]].copy()
+    if peer.empty or ID_COL not in peer.columns:
+        return pd.DataFrame({ID_COL: X[ID_COL]}) if ID_COL in X.columns else pd.DataFrame()
+    if "OCCP_GRP_1" in peer.columns:
+        peer["OCCP_GRP_1"] = peer["OCCP_GRP_1"].map(_strip_two_chars)
+    if "AGE" in peer.columns:
+        peer["AGE"] = peer["AGE"].map(lambda x: int(pd.to_numeric(x, errors="coerce") or 0) // 10)
+    if DIVIDED_SET_COL in peer.columns:
+        peer[DIVIDED_SET_COL] = pd.to_numeric(peer[DIVIDED_SET_COL], errors="coerce")
+    return peer
+
+
 class BookSurveyPaperStrategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
@@ -229,12 +277,7 @@ class BookSurveyPaperStrategy(BaseStrategy):
         y_bin = _y_binary(y)
         X_out = X.copy()
 
-        paper_meta_cols = [ID_COL]
-        if "CUST_RGST" in X_out.columns:
-            paper_meta_cols.append("CUST_RGST")
-        if "MAX_PAYM_YM" in X_out.columns:
-            paper_meta_cols.append("MAX_PAYM_YM")
-        paper_meta = X_out[paper_meta_cols].copy()
+        paper_meta = _paper_survey_paper_meta_from_X(X_out)
 
         X_out = _drop_cust_dates(X_out)
 
@@ -279,11 +322,9 @@ class BookSurveyPaperStrategy(BaseStrategy):
             if c in X_out.columns:
                 X_out[c] = pd.to_numeric(X_out[c], errors="coerce").fillna(0.0)
 
-        if "TOTALPREM" in X_out.columns and "CUST_INCM" in X_out.columns:
-            inc = pd.to_numeric(X_out["CUST_INCM"], errors="coerce").clip(lower=0)
-            prm = pd.to_numeric(X_out["TOTALPREM"], errors="coerce").fillna(0.0)
-            X_out["paper_prem_incm_ratio"] = prm / (inc + 1.0)
-            X_out["paper_incm_missing_or_zero"] = ((inc <= 0) | X_out["CUST_INCM"].isna()).astype(float)
+        addons = _paper_survey_customer_addons(X_out)
+        if not addons.empty:
+            X_out = X_out.merge(addons, on=ID_COL, how="left")
 
         if "FP_CAREER" in X_out.columns:
             X_out = X_out.drop(columns=["FP_CAREER"])
@@ -304,10 +345,7 @@ class BookSurveyPaperStrategy(BaseStrategy):
             if new_cols:
                 X_out[new_cols] = X_out[new_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
 
-        peer_cols = [ID_COL, "OCCP_GRP_1", "AGE"]
-        if DIVIDED_SET_COL in X_out.columns:
-            peer_cols.append(DIVIDED_SET_COL)
-        peer_frame = X_out[[c for c in peer_cols if c in X_out.columns]].copy()
+        peer_frame = _paper_survey_peer_for_block(X_out)
         paper_agg = _paper_survey_block(claim_df, paper_meta, peer_frame)
         if not paper_agg.empty:
             X_out = X_out.merge(paper_agg, on=ID_COL, how="left")

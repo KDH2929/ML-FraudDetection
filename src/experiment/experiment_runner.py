@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from src.config import ARTIFACTS_DIR, STRATEGY_THRESHOLDS, RANDOM_STATE
+from src.config import ARTIFACTS_DIR, MODEL_PARAMS, RANDOM_STATE, STRATEGY_THRESHOLDS
 from src.models.model_factory import get_model
 from src.pipeline import pipeline_builder, trainer
 from src.pipeline.data_loader import load_and_split
@@ -28,18 +28,23 @@ def _result_filename(strategy_id: str):
 
 def _run_single_model(strategy_id: str, processed_csv: str, model_name: str, use_optimization: bool = False):
     train_X, test_X, train_y, test_y = load_and_split(str(processed_csv))
+    pos = int((train_y == 1).sum())
+    neg = int((train_y == 0).sum())
+    scale_pos_weight = float(neg) / max(1, pos)
 
     # use_optimization=True일 때만 tuning 결과 로드
     tuning_results_path = ARTIFACTS_DIR / f"{strategy_id}_tuning_results.json"
     if use_optimization and tuning_results_path.exists() and model_name == "lgbm":
         import lightgbm as lgb
-        with open(tuning_results_path, 'r', encoding='utf-8') as f:
+
+        with open(tuning_results_path, encoding="utf-8") as f:
             tuning_results = json.load(f)
-        best_params = tuning_results['best_params']
-        model = lgb.LGBMClassifier(**best_params, random_state=RANDOM_STATE, verbosity=-1)
+        best_params = tuning_results["best_params"]
+        merged = {**MODEL_PARAMS["lgbm"], **best_params}
         print(f"  [Using tuned params from {tuning_results_path.name}]")
+        model = lgb.LGBMClassifier(**merged, random_state=RANDOM_STATE, verbosity=-1)
     else:
-        model = get_model(model_name)
+        model = get_model(model_name, scale_pos_weight=scale_pos_weight)
 
     # 현재 공통 실행은 모델 비교까지만 담당하고, 세부 최적화는 수동으로 진행한다.
     pipeline = pipeline_builder.build(strategy=None, model=model, sampler=None, selector=None)
