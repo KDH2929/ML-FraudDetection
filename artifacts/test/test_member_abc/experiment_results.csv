@@ -1,0 +1,2 @@
+recall_class1,f1_class1,f1_macro,strategy,model,threshold
+0.7416974169741697,0.6919104991394148,0.8299788125829171,test_member_abc,lgbm,0.3109
