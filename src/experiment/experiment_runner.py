@@ -15,6 +15,19 @@ STRATEGIES = list_strategies()
 MODEL_OPTIONS = ["lgbm", "rf", "logistic", "xgboost", "catboost", "voting", "stacking"]
 
 
+def _threshold_for_strategy(strategy_id: str):
+    """LGBM용 분류 임계값: ``STRATEGY_THRESHOLDS`` 우선, 없으면 ``artifacts/{id}_threshold_analysis.json``."""
+    if strategy_id in STRATEGY_THRESHOLDS:
+        return float(STRATEGY_THRESHOLDS[strategy_id])
+    path = ARTIFACTS_DIR / f"{strategy_id}_threshold_analysis.json"
+    if not path.is_file():
+        return None
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    bt = data.get("best_threshold")
+    return float(bt) if bt is not None else None
+
+
 def _resolve_models(model_name="lgbm"):
     normalized = str(model_name).lower()
     if normalized == "all":
@@ -50,19 +63,20 @@ def _run_single_model(strategy_id: str, processed_csv: str, model_name: str, use
     pipeline = pipeline_builder.build(strategy=None, model=model, sampler=None, selector=None)
     fitted = trainer.train(pipeline, train_X, train_y)
 
-    # use_optimization=True일 때만 최적 threshold 적용
-    if use_optimization and strategy_id in STRATEGY_THRESHOLDS:
-        threshold = STRATEGY_THRESHOLDS[strategy_id]
+    # threshold_optimizer 결과: config 또는 artifacts/{id}_threshold_analysis.json (LGBM + proba 일 때만).
+    threshold = _threshold_for_strategy(strategy_id)
+    if threshold is not None and model_name == "lgbm" and hasattr(fitted, "predict_proba"):
         y_pred_proba = fitted.predict_proba(test_X)[:, 1]
         y_pred = (y_pred_proba >= threshold).astype(int)
     else:
         y_pred = fitted.predict(test_X)
-        threshold = None
+        if model_name != "lgbm" or not hasattr(fitted, "predict_proba"):
+            threshold = None
 
     result = metrics.evaluate(test_y, y_pred)
     result["strategy"] = strategy_id
     result["model"] = model_name
-    if use_optimization and threshold is not None:
+    if threshold is not None:
         result["threshold"] = threshold
     return result, fitted
 
@@ -94,7 +108,7 @@ def run_strategy(
             {
                 "model": result["model"],
                 "recall_class1": result["recall_class1"],
-                "f1_class1": result["f1_class1"],
+                "f1 (class 1)": result["f1_class1"],
                 "f1_macro": result["f1_macro"],
             },
         )

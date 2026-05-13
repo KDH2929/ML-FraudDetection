@@ -166,7 +166,7 @@ def analyze_strategy(
     """
     import lightgbm as lgb
     import json
-    from src.config import MODEL_PARAMS, RANDOM_STATE
+    from src.config import MODEL_PARAMS
     from src.preprocessing.processed_data import ensure_processed_csv
 
     if output_dir is None:
@@ -193,10 +193,10 @@ def analyze_strategy(
         best_params = tuning_results['best_params']
         print(f"Training model with best params...")
         merged = {**MODEL_PARAMS["lgbm"], **best_params}
-        model = lgb.LGBMClassifier(**merged, random_state=RANDOM_STATE, verbosity=-1)
+        model = lgb.LGBMClassifier(**merged)
     else:
         print(f"No tuning results found. Using default params...")
-        model = lgb.LGBMClassifier(**MODEL_PARAMS["lgbm"], random_state=RANDOM_STATE, verbosity=-1)
+        model = lgb.LGBMClassifier(**MODEL_PARAMS["lgbm"])
 
     model.fit(train_X, train_y)
 
