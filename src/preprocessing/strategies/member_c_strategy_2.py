@@ -10,6 +10,7 @@ from sklearn.model_selection import KFold
 from sklearn.preprocessing import StandardScaler
 
 from src.preprocessing.components.encoder import OneHotEncoder
+from src.preprocessing.components.features.member_c_features import MemberCV2FeaturePipeline
 from src.preprocessing.components.missing_value import MedianImputer, ZeroImputer
 from src.preprocessing.components.outlier import QuantileCapper
 from src.preprocessing.strategies.base_strategy import BaseStrategy
@@ -60,6 +61,9 @@ class MemberCStrategy2(BaseStrategy):
         y: pd.Series,
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
+        pipeline = MemberCV2FeaturePipeline()
+        return pipeline.run(self, X, y, claim_df)
+
         if claim_df is None:
             raise ValueError("member_c_strategy_2 는 claim_df가 필요합니다.")
 
