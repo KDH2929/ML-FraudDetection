@@ -116,13 +116,14 @@ def analyze_strategy(
     output_dir=None,
     *,
     force_preprocess: bool = False,
+    n_estimators: int | None = None,
 ):
     import json
 
     import lightgbm as lgb
     from sklearn.metrics import precision_score
 
-    from src.config import MODEL_PARAMS, RANDOM_STATE
+    from src.config import MODEL_PARAMS
     from src.preprocessing.processed_data import ensure_processed_csv
 
     base_output_dir = Path(output_dir) if output_dir is not None else None
@@ -137,6 +138,10 @@ def analyze_strategy(
 
     print(f"Loading data: {processed_csv}")
     train_X, test_X, train_y, test_y = load_and_split(str(processed_csv))
+    print(
+        f"Train matrix: {train_X.shape[0]:,} rows × {train_X.shape[1]:,} features "
+        f"(wide ABC-style decks are slow: each tree scans many columns)"
+    )
 
     tuning_path = tuning_results_path(strategy_id)
     if tuning_path.exists():
@@ -146,12 +151,21 @@ def analyze_strategy(
         best_params = tuning_results["best_params"]
         print("Training model with best params...")
         merged = {**MODEL_PARAMS["lgbm"], **best_params}
-        merged["random_state"] = RANDOM_STATE
-        merged["verbosity"] = -1
+        if n_estimators is not None:
+            merged = {**merged, "n_estimators": int(n_estimators)}
         model = lgb.LGBMClassifier(**merged)
     else:
         print("No tuning results found. Using default params...")
-        model = lgb.LGBMClassifier(**MODEL_PARAMS["lgbm"], random_state=RANDOM_STATE, verbosity=-1)
+        params = dict(MODEL_PARAMS["lgbm"])
+        if n_estimators is not None:
+            params["n_estimators"] = int(n_estimators)
+        model = lgb.LGBMClassifier(**params)
+
+    if n_estimators is not None:
+        print(
+            f"[Note] n_estimators={int(n_estimators)} (override): faster; "
+            f"best_threshold can differ from a full {MODEL_PARAMS['lgbm']['n_estimators']}-tree fit."
+        )
 
     model.fit(train_X, train_y)
 
@@ -201,6 +215,7 @@ def analyze_strategy(
 
     results = {
         "strategy_id": strategy_id,
+        "lgbm_n_estimators": int(model.n_estimators),
         "best_threshold": float(best_threshold),
         "default_performance": {
             "recall": float(result["recall_class1"]),
@@ -244,12 +259,28 @@ if __name__ == "__main__":
         action="store_true",
         help="Regenerate the preprocessed CSV before analysis.",
     )
+    parser.add_argument(
+        "--n-estimators",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Override LGBM n_estimators (lower = faster; default from config / tuning JSON).",
+    )
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="Shorthand for --n-estimators 200 (faster threshold pass on wide data).",
+    )
 
     args = parser.parse_args()
+    n_est = args.n_estimators
+    if args.quick and n_est is None:
+        n_est = 200
 
     analyze_strategy(
         strategy_id=args.strategy,
         model_path=args.model,
         output_dir=args.output_dir,
         force_preprocess=args.force_preprocess,
+        n_estimators=n_est,
     )
