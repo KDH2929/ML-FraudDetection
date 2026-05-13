@@ -32,6 +32,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 
 from src.config import DIVIDED_SET_COL, ID_COL
+from src.optimization.feature_selector import CorrelationRemover, ImportanceSelector
 from src.preprocessing.strategies.base_strategy import BaseStrategy
 from src.preprocessing.strategies.book_survey_paper_dedup_strategy import (
     _PAPER_DROP_FOR_MULTICOLLINEARITY,
@@ -250,10 +251,52 @@ def _apply_feature_selection(df: pd.DataFrame, state: _A5SelectionState) -> pd.D
     return df.reindex(columns=cols, fill_value=0.0)
 
 
+def _fit_lgbm_top_k(
+    train_df: pd.DataFrame,
+    y: pd.Series,
+    *,
+    top_k: int,
+    corr_threshold: float,
+) -> _A5SelectionState:
+    """CorrelationRemover → LightGBM ImportanceSelector(top_k). train 행에만 fit."""
+    meta = _meta_columns(train_df)
+    feat_names = [c for c in train_df.columns if c not in meta]
+    if not feat_names:
+        return _A5SelectionState(meta_cols=meta, feature_cols=[])
+
+    X_feats = (
+        train_df[feat_names]
+        .apply(pd.to_numeric, errors="coerce")
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+    )
+
+    corr_rem = CorrelationRemover(threshold=corr_threshold)
+    corr_rem.fit(X_feats)
+    feat_names = corr_rem.selected_cols_
+    X_feats = X_feats[feat_names]
+
+    y_arr = _y_int_binary(y.reindex(train_df.index))
+    k = min(top_k, len(feat_names))
+    if len(np.unique(y_arr)) < 2 or k == 0:
+        return _A5SelectionState(meta_cols=meta, feature_cols=feat_names[:k])
+
+    selector = ImportanceSelector(top_k=k)
+    selector.fit(X_feats, y_arr)
+    return _A5SelectionState(meta_cols=meta, feature_cols=selector.selected_cols_)
+
+
 class MemberA5Strategy(BaseStrategy):
     """
     기본: A4 + paper dedup (A4 대비 초고상관 paper_* 만 정리).
+    top_k 설정 시: CorrelationRemover + LightGBM top-k 피처 선택 (B v3 방식).
+    skip_paper_drop=True: paper_* 다중공선성 제거를 건너뜀 → A4 출력에 바로 top_k 적용.
     advanced_feature_selection=True: VIF·필터·RFE 실험 파이프라인 (성능 하락 가능).
+
+    실험 조합:
+      A5 기본          : skip_paper_drop=False, top_k=None
+      A4 + top_k       : skip_paper_drop=True,  top_k=100
+      A5 + top_k       : skip_paper_drop=False, top_k=100
     """
 
     def __init__(
@@ -265,6 +308,9 @@ class MemberA5Strategy(BaseStrategy):
         max_vif_iter: int = 28,
         rfe_max_features: int = 120,
         use_rfe: bool = True,
+        top_k: int | None = None,
+        lgbm_corr_threshold: float = 0.95,
+        skip_paper_drop: bool = False,
     ) -> None:
         self._base = MemberA4Strategy()
         self._advanced = advanced_feature_selection
@@ -273,13 +319,19 @@ class MemberA5Strategy(BaseStrategy):
         self._max_vif_iter = max_vif_iter
         self._rfe_max_features = rfe_max_features
         self._use_rfe = use_rfe
+        self._top_k = top_k
+        self._lgbm_corr_threshold = lgbm_corr_threshold
+        self._skip_paper_drop = skip_paper_drop
 
     def get_strategy_name(self) -> str:
+        parts = ["A5: A4"]
+        if not self._skip_paper_drop:
+            parts.append("paper_* 다중공선성 축소")
+        if self._top_k is not None:
+            parts.append(f"LightGBM top-{self._top_k}")
         if self._advanced:
-            return (
-                "A5: A4+paper dedup + 정제·필터·RFE (advanced_feature_selection=True, 실험용)"
-            )
-        return "A5: A4 + paper_* 다중공선성 축소 (기본, advanced 선택 끔)"
+            parts.append("정제·필터·RFE")
+        return " + ".join(parts)
 
     def preprocess(
         self,
@@ -288,7 +340,13 @@ class MemberA5Strategy(BaseStrategy):
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         out = self._base.preprocess(X, y, claim_df=claim_df)
-        out = _drop_paper_multicollinearity(out)
+        if not self._skip_paper_drop:
+            out = _drop_paper_multicollinearity(out)
+        if self._top_k is not None:
+            state = _fit_lgbm_top_k(
+                out, y, top_k=self._top_k, corr_threshold=self._lgbm_corr_threshold
+            )
+            out = _apply_feature_selection(out, state)
         if not self._advanced:
             return out
         state = _fit_feature_selection(
@@ -312,9 +370,17 @@ class MemberA5Strategy(BaseStrategy):
         tr, te = self._base.preprocess_train_test(
             X_train, y_train, X_test, claim_df=claim_df
         )
-        tr = _drop_paper_multicollinearity(tr)
-        te = _drop_paper_multicollinearity(te)
-        te = te.reindex(columns=tr.columns, fill_value=0.0)
+        if not self._skip_paper_drop:
+            tr = _drop_paper_multicollinearity(tr)
+            te = _drop_paper_multicollinearity(te)
+            te = te.reindex(columns=tr.columns, fill_value=0.0)
+        if self._top_k is not None:
+            state = _fit_lgbm_top_k(
+                tr, y_train, top_k=self._top_k, corr_threshold=self._lgbm_corr_threshold
+            )
+            tr = _apply_feature_selection(tr, state)
+            te = _apply_feature_selection(te, state)
+            te = te.reindex(columns=tr.columns, fill_value=0.0)
         if not self._advanced:
             return tr, te
         state = _fit_feature_selection(
