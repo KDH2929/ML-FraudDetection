@@ -1,5 +1,6 @@
 from numbers import Real
 
+import numpy as np
 from sklearn.metrics import f1_score, recall_score
 
 
@@ -12,12 +13,24 @@ def evaluate(y_true, y_pred) -> dict:
     }
 
 
+def _format_metric_value(value) -> str:
+    """sklearn/numpy 스칼라까지 소수 4자리로 통일."""
+    if isinstance(value, Real) and not isinstance(value, bool):
+        return f"{float(value):.4f}"
+    if isinstance(value, (np.floating, np.integer)):
+        return f"{float(value):.4f}"
+    try:
+        return f"{float(value):.4f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def print_report(member: str, metrics_dict: dict):
     sep = "-" * 50
     print(sep)
     print(f"[{member}] 실험 결과")
     print(sep)
     for key, value in metrics_dict.items():
-        formatted = f"{value:.4f}" if isinstance(value, Real) else str(value)
+        formatted = _format_metric_value(value)
         print(f"  {key:<20}: {formatted}")
     print(sep)

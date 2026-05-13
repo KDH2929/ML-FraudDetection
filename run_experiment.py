@@ -34,6 +34,11 @@ if __name__ == "__main__":
         help="이미 CSV가 있어도 전처리를 다시 실행함",
     )
     parser.add_argument(
+        "--use-tuning",
+        action="store_true",
+        help="artifacts/{strategy}_tuning_results.json 이 있으면 LGBM 하이퍼파라미터 병합 (임계값은 STRATEGY_THRESHOLDS 또는 artifacts/{strategy}_threshold_analysis.json)",
+    )
+    parser.add_argument(
         "--generate-report",
         action="store_true",
         help="실험 완료 후 최적화 보고서 자동 생성",
@@ -58,12 +63,14 @@ if __name__ == "__main__":
         run_all(
             model_name=args.model,
             force_preprocess=args.force_preprocess,
+            use_optimization=args.use_tuning,
         )
     elif target_strategy:
         run(
             target_strategy,
             model_name=args.model,
             force_preprocess=args.force_preprocess,
+            use_optimization=args.use_tuning,
         )
 
         # 실험 완료 후 보고서 자동 생성
