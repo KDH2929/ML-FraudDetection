@@ -1,0 +1,7 @@
+{
+  "best_strategy": "test_cust",
+  "model": "lgbm",
+  "f1_class1": 0.9113680154142582,
+  "recall_class1": 0.8726937269372693,
+  "f1_macro": 0.9516232732438523
+}
