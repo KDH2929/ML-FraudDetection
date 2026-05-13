@@ -9,20 +9,25 @@ STRATEGY_DIR = Path(__file__).resolve().parent / "strategies"
 
 
 def _module_stem_to_strategy_id(stem: str) -> str:
-    # 기존 member_a_strategy.py 형태는 member_a로 짧게 매핑한다.
-    if stem.endswith("_strategy") and stem.count("_") == 2:
+    # foo_bar_strategy.py → foo_bar (예: member_a_strategy, book_survey_paper_strategy).
+    # member_b_strategy_2.py 처럼 `_strategy`로 끝나지 않으면 stem 전체가 ID(동료 버전 파일).
+    if stem.endswith("_strategy"):
         return stem[: -len("_strategy")]
     return stem
 
 
 def _discover_strategy_modules():
     modules = []
-    # member_c_strategy_1.py 같은 수동 버전 파일도 자동으로 인식한다.
-    for path in sorted(STRATEGY_DIR.glob("member*_strategy*.py")):
-        if path.name.startswith("__"):
-            continue
-        modules.append(path.stem)
-    return modules
+    for pattern in (
+        "member*_strategy*.py",
+        "book*_strategy*.py",
+        "test*_strategy*.py",
+    ):
+        for path in sorted(STRATEGY_DIR.glob(pattern)):
+            if path.name.startswith("__"):
+                continue
+            modules.append(path.stem)
+    return sorted(set(modules))
 
 
 def _load_strategy_class(module_stem: str):
