@@ -1,4 +1,6 @@
 import argparse
+import subprocess
+import sys
 
 from src.experiment.experiment_runner import (
     MODEL_OPTIONS,
@@ -31,6 +33,16 @@ if __name__ == "__main__":
         action="store_true",
         help="이미 CSV가 있어도 전처리를 다시 실행함",
     )
+    parser.add_argument(
+        "--generate-report",
+        action="store_true",
+        help="실험 완료 후 최적화 보고서 자동 생성",
+    )
+    parser.add_argument(
+        "--baseline",
+        type=str,
+        help="보고서 생성 시 비교 대상 전략 ID (예: member_b)",
+    )
     args = parser.parse_args()
 
     target_strategy = args.strategy or args.member
@@ -53,5 +65,15 @@ if __name__ == "__main__":
             model_name=args.model,
             force_preprocess=args.force_preprocess,
         )
+
+        # 실험 완료 후 보고서 자동 생성
+        if args.generate_report:
+            print("\n" + "=" * 80)
+            print("최적화 보고서 생성 중...")
+            print("=" * 80)
+            cmd = [sys.executable, "generate_report.py", "--strategy", target_strategy]
+            if args.baseline:
+                cmd.extend(["--baseline", args.baseline])
+            subprocess.run(cmd)
     else:
         parser.print_help()

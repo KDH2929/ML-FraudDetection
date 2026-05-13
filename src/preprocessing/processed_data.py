@@ -10,7 +10,7 @@ from src.preprocessing.preprocessor_factory import STRATEGY_REGISTRY, get_strate
 def _restore_required_columns(raw_X: pd.DataFrame, processed_X: pd.DataFrame) -> pd.DataFrame:
     # 전략 구현에서 빠뜨리기 쉬운 기본 식별 컬럼은 공통부에서 다시 보강한다.
     restored = processed_X.copy()
-    for col in [ID_COL, DIVIDED_SET_COL]:
+    for col in [ID_COL]:
         if col in raw_X.columns and col not in restored.columns:
             restored[col] = raw_X[col].values
     return restored
@@ -18,14 +18,14 @@ def _restore_required_columns(raw_X: pd.DataFrame, processed_X: pd.DataFrame) ->
 
 def _coerce_metadata_columns(df: pd.DataFrame) -> pd.DataFrame:
     coerced = df.copy()
-    for col in [ID_COL, DIVIDED_SET_COL]:
+    for col in [ID_COL]:
         if col in coerced.columns:
             coerced[col] = pd.to_numeric(coerced[col], errors="raise")
     return coerced
 
 
 def _validate_processed_dataframe(member: str, df: pd.DataFrame):
-    missing_required = [col for col in [ID_COL, DIVIDED_SET_COL, TARGET_COL] if col not in df.columns]
+    missing_required = [col for col in [ID_COL, TARGET_COL] if col not in df.columns]
     if missing_required:
         raise ValueError(f"{member} 전처리 데이터에 필수 컬럼이 없습니다: {missing_required}")
 
@@ -44,9 +44,9 @@ def _validate_processed_dataframe(member: str, df: pd.DataFrame):
         )
 
 
-def build_processed_dataframe(member: str) -> pd.DataFrame:
+def build_processed_dataframe(member: str, strategy_kwargs: dict | None = None) -> pd.DataFrame:
     # 전략은 X만 가공하고, 공통부가 메타 컬럼/타깃을 붙여 최종 CSV 형태를 맞춘다.
-    strategy = get_strategy(member)
+    strategy = get_strategy(member, **(strategy_kwargs or {}))
     cust_df = load_customer_data()
     claim_df = load_claim_data()
 
@@ -65,7 +65,9 @@ def build_processed_dataframe(member: str) -> pd.DataFrame:
     processed_X = _coerce_metadata_columns(processed_X)
     processed_df = processed_X.copy()
     processed_df[TARGET_COL] = y
-    ordered_cols = [col for col in [ID_COL, DIVIDED_SET_COL, TARGET_COL] if col in processed_df.columns]
+    ordered_cols = [col for col in [ID_COL, TARGET_COL] if col in processed_df.columns]
+    if DIVIDED_SET_COL in processed_df.columns:
+        ordered_cols.append(DIVIDED_SET_COL)
     ordered_cols += [col for col in processed_df.columns if col not in ordered_cols]
     processed_df = processed_df[ordered_cols]
 
@@ -73,13 +75,13 @@ def build_processed_dataframe(member: str) -> pd.DataFrame:
     return processed_df
 
 
-def ensure_processed_csv(member: str, force: bool = False):
+def ensure_processed_csv(member: str, force: bool = False, strategy_kwargs: dict | None = None):
     processed_path = PROCESSED_DIR / f"{member}_preprocessed.csv"
     if processed_path.exists() and not force:
         return processed_path
 
     try:
-        processed_df = build_processed_dataframe(member)
+        processed_df = build_processed_dataframe(member, strategy_kwargs=strategy_kwargs)
     except NotImplementedError:
         print(f"[SKIP] {member} 전략은 아직 구현되지 않았습니다.")
         return None
