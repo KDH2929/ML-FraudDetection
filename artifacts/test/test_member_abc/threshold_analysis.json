@@ -1,0 +1,44 @@
+{
+  "strategy_id": "test_member_abc",
+  "lgbm_n_estimators": 500,
+  "best_threshold": 0.31091456879444657,
+  "default_performance": {
+    "recall": 0.6586715867158671,
+    "f1": 0.6839080459770115,
+    "precision": 0.7111553784860558
+  },
+  "optimized_performance": {
+    "recall": 0.7416974169741697,
+    "f1": 0.6919104991394148,
+    "precision": 0.6483870967741936
+  },
+  "improvement": {
+    "recall": 0.08302583025830257,
+    "f1": 0.008002453162403333,
+    "precision": -0.06276828171186222
+  },
+  "misclassification_analysis": {
+    "confusion_matrix": {
+      "TN": 5423,
+      "FP": 218,
+      "FN": 140,
+      "TP": 402
+    },
+    "fn_count": 140,
+    "fp_count": 218,
+    "fn_avg_proba": 0.07880198852328427,
+    "fp_avg_proba": 0.6597541065197196,
+    "fn_distinctive_features": {
+      "mb3_IS_OUTLIER_GRAPH2_DOC_PER_HOSP_LOWER": 7142857142.8571415,
+      "mb3_IS_OUTLIER_ANOM_DMND_KURT_LOWER": 7142857142.8571415,
+      "mc4_RESI_TYPE_CODE_50": 7142857142.8571415,
+      "ma4_drz_dmnd_paym_spread_mean": 5185.684604448265,
+      "mb3_DEV2_DSAS_DMND_PERCENTILE_MAX": 1052.1568214252466,
+      "mb3_RESI_COST": 756.9540087028086,
+      "mc4_doctor_freq_min": 673.7195304656002,
+      "mb3_MED2_HOSP_10.0": 527.1126161315598,
+      "mc4_OCCP_GRP_1_6.\uc81c\uc870\uc5c5": 474.28570951914287,
+      "mc4_AGE_GROUP_70plus": 474.28570475257163
+    }
+  }
+}
