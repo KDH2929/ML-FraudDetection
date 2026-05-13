@@ -28,17 +28,21 @@ MODEL_PARAMS = {
         "random_state": RANDOM_STATE,
         "n_jobs": -1,
         "verbose": -1,
+        "class_weight": "balanced",
     },
     "rf": {
         "n_estimators": 300,
         "max_depth": 10,
         "random_state": RANDOM_STATE,
         "n_jobs": -1,
+        "class_weight": "balanced_subsample",
     },
     "logistic": {
-        "max_iter": 1000,
+        "max_iter": 2000,
         "random_state": RANDOM_STATE,
         "n_jobs": -1,
+        "class_weight": "balanced",
+        "solver": "lbfgs",
     },
     "xgboost": {
         "n_estimators": 500,
@@ -47,6 +51,7 @@ MODEL_PARAMS = {
         "random_state": RANDOM_STATE,
         "n_jobs": -1,
         "verbosity": 0,
+        # scale_pos_weight 는 실험 러너에서 train_y 비율로 채움 (미설정 시 1.0)
     },
     "catboost": {
         "iterations": 500,
@@ -55,6 +60,7 @@ MODEL_PARAMS = {
         "random_state": RANDOM_STATE,
         "thread_count": -1,
         "verbose": False,
+        "auto_class_weights": "Balanced",
     },
     # Voting: LightGBM + XGBoost + CatBoost (soft voting)
     "voting": {

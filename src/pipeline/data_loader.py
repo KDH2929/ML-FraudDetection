@@ -38,7 +38,11 @@ def normalize_target(y: pd.Series) -> pd.Series:
 
 
 def load_and_split(processed_csv: str):
-    """전처리된 CSV에서 학습 가능한 라벨 데이터만 골라 train/test로 나눈다."""
+    """전처리된 CSV에서 학습 가능한 라벨 데이터만 골라 train/test로 나눈다.
+
+    ``train_test_split(..., stratify=y)`` 로 **train·test 각각에서 양성 비율**이
+    원천과 같게 유지된다. (표본 수 자체는 여전히 불균형 — 균등 샘플링은 아님.)
+    """
     df = _read_csv(processed_csv)
     if TARGET_COL not in df.columns:
         raise ValueError(f"전처리 CSV에는 타깃 컬럼이 반드시 있어야 합니다: {TARGET_COL}")
