@@ -48,3 +48,6 @@ Thumbs.db
 
 # Project docs
 CLAUDE.md
+
+# 로컬 전용 PPT 생성 스크립트·산출물 (Git 미추적)
+ppt_local/

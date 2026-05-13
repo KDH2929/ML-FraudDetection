@@ -15,7 +15,7 @@ class GroupMeanImputer:
 
     def fit(self, X: pd.DataFrame, y=None):
         self.group_means_ = (
-            X.groupby(self.group_cols)[self.target_col].mean().to_dict()
+            X.groupby(self.group_cols)[self.target_col].mean().dropna().to_dict()
         )
         self.global_mean_ = X[self.target_col].mean()
         return self
