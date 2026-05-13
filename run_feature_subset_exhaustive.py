@@ -33,11 +33,11 @@ from src.config import (
     DIVIDED_SET_COL,
     DROP_COLS,
     ID_COL,
-    PROCESSED_DIR,
     RANDOM_STATE,
     TARGET_COL,
 )
 from src.pipeline.data_loader import _read_csv, normalize_target
+from src.project_paths import processed_csv_path, strategy_artifact_dir
 
 
 def _load_xy_from_processed(
@@ -227,7 +227,7 @@ def main() -> None:
     if args.csv:
         csv_path = Path(args.csv)
     elif args.strategy:
-        csv_path = PROCESSED_DIR / f"{args.strategy}_preprocessed.csv"
+        csv_path = processed_csv_path(args.strategy)
     else:
         ap.error("--strategy 또는 --csv 중 하나는 필요합니다.")
 
@@ -304,7 +304,10 @@ def main() -> None:
         out["best_mask"] = int(best_mask)
 
     stem = csv_path.stem.replace("_preprocessed", "")
-    default_out = ARTIFACTS_DIR / f"feature_subset_exhaustive_{stem}.json"
+    if args.strategy:
+        default_out = strategy_artifact_dir(args.strategy) / "feature_subset_exhaustive.json"
+    else:
+        default_out = ARTIFACTS_DIR / f"feature_subset_exhaustive_{stem}.json"
     out_path = Path(args.output_json) if args.output_json else default_out
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:

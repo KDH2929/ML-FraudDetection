@@ -1,10 +1,9 @@
-from pathlib import Path
-
 import pandas as pd
 
-from src.config import DIVIDED_SET_COL, ID_COL, PROCESSED_DIR, TARGET_COL
+from src.config import DIVIDED_SET_COL, ID_COL, TARGET_COL
 from src.pipeline.data_loader import load_claim_data, load_customer_data, normalize_target
 from src.preprocessing.preprocessor_factory import STRATEGY_REGISTRY, get_strategy
+from src.project_paths import processed_csv_path
 
 
 def _restore_required_columns(raw_X: pd.DataFrame, processed_X: pd.DataFrame) -> pd.DataFrame:
@@ -76,7 +75,7 @@ def build_processed_dataframe(member: str, strategy_kwargs: dict | None = None) 
 
 
 def ensure_processed_csv(member: str, force: bool = False, strategy_kwargs: dict | None = None):
-    processed_path = PROCESSED_DIR / f"{member}_preprocessed.csv"
+    processed_path = processed_csv_path(member)
     if processed_path.exists() and not force:
         return processed_path
 
@@ -86,7 +85,7 @@ def ensure_processed_csv(member: str, force: bool = False, strategy_kwargs: dict
         print(f"[SKIP] {member} 전략은 아직 구현되지 않았습니다.")
         return None
 
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    processed_path.parent.mkdir(parents=True, exist_ok=True)
     processed_df.to_csv(processed_path, index=False)
     print(f"[OK] 전처리 CSV 생성 완료: {processed_path}")
     return processed_path

@@ -10,8 +10,8 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 
-REPORTS_DIR = Path("docs/optimization_reports")
-ARTIFACTS_DIR = Path("artifacts")
+from src.project_paths import REPORTS_DIR, experiment_result_path, processed_csv_path, report_path as build_report_path
+
 
 _META_COLS = frozenset({"CUST_ID", "SIU_CUST_YN", "DIVIDED_SET"})
 
@@ -88,7 +88,7 @@ def _member_c_feature_groups(columns: list[str]) -> dict[str, int]:
 
 def load_experiment_result(strategy_id: str):
     """실험 결과 로드"""
-    result_path = ARTIFACTS_DIR / f"experiment_result_{strategy_id}.csv"
+    result_path = experiment_result_path(strategy_id)
     if not result_path.exists():
         return None
 
@@ -105,7 +105,7 @@ def load_experiment_result(strategy_id: str):
 
 def load_processed_csv_info(strategy_id: str):
     """전처리 CSV 정보 로드"""
-    csv_path = Path(f"data/processed/{strategy_id}_preprocessed.csv")
+    csv_path = processed_csv_path(strategy_id)
     if not csv_path.exists():
         return None
 
@@ -277,25 +277,30 @@ def generate_report(strategy_id: str, baseline_id: str = None, version: str = No
     report.append(f"```\n")
 
     # 파일 저장
-    report_filename = f"{strategy_id}_{version}_report.md"
-    report_path = REPORTS_DIR / report_filename
+    output_path = build_report_path(strategy_id, version)
+    report_path = output_path
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(report_path, 'w', encoding='utf-8') as f:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
         f.writelines(report)
 
+    print(f"[OK] 보고서 생성 완료: {output_path}")
+    return output_path
+
     print(f"[OK] 보고서 생성 완료: {report_path}")
-    return report_path
+    print(f"[OK] 蹂닿퀬???앹꽦 ?꾨즺: {output_path}")
+    return output_path
 
 
 def update_index():
     """보고서 인덱스의 '보고서 목록' 섹만 갱신하고, README 나머지(사용 방법 등)는 유지한다."""
-    reports = sorted(REPORTS_DIR.glob("*_report.md"))
+    reports = sorted(REPORTS_DIR.glob("*/*_report.md"))
 
     lines = ["## 보고서 목록\n", "\n"]
     for report_path in reports:
         filename = report_path.stem.replace("_report", "")
-        lines.append(f"- [{filename}](./{report_path.name})\n")
+        relative_path = report_path.relative_to(REPORTS_DIR).as_posix()
+        lines.append(f"- [{filename}](./{relative_path})\n")
     lines.append("\n")
     list_block = "".join(lines)
 

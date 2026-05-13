@@ -4,12 +4,12 @@
 
 ## 보고서 목록
 
-- [member_b_strategy_2_v2](./member_b_strategy_2_v2_report.md)
-- [member_b_v1](./member_b_v1_report.md)
-- [member_c_strategy_2_v2](./member_c_strategy_2_v2_report.md)
-- [member_c_strategy_3_v3](./member_c_strategy_3_v3_report.md)
-- [member_c_strategy_4_v4](./member_c_strategy_4_v4_report.md)
-- [member_c_v1](./member_c_v1_report.md)
+- [member_b_strategy_2_v2](./member_b/member_b_strategy_2_v2_report.md)
+- [member_b_v1](./member_b/member_b_v1_report.md)
+- [member_c_strategy_2_v2](./member_c/member_c_strategy_2_v2_report.md)
+- [member_c_strategy_3_v3](./member_c/member_c_strategy_3_v3_report.md)
+- [member_c_strategy_4_v4](./member_c/member_c_strategy_4_v4_report.md)
+- [member_c_v1](./member_c/member_c_v1_report.md)
 
 
 ---
