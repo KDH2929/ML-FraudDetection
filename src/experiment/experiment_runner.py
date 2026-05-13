@@ -26,12 +26,12 @@ def _result_filename(strategy_id: str):
     return ARTIFACTS_DIR / f"experiment_result_{strategy_id}.csv"
 
 
-def _run_single_model(strategy_id: str, processed_csv: str, model_name: str):
+def _run_single_model(strategy_id: str, processed_csv: str, model_name: str, use_optimization: bool = False):
     train_X, test_X, train_y, test_y = load_and_split(str(processed_csv))
 
-    # tuning 결과가 있으면 자동 로드
+    # use_optimization=True일 때만 tuning 결과 로드
     tuning_results_path = ARTIFACTS_DIR / f"{strategy_id}_tuning_results.json"
-    if tuning_results_path.exists() and model_name == "lgbm":
+    if use_optimization and tuning_results_path.exists() and model_name == "lgbm":
         import lightgbm as lgb
         with open(tuning_results_path, 'r', encoding='utf-8') as f:
             tuning_results = json.load(f)
@@ -45,18 +45,19 @@ def _run_single_model(strategy_id: str, processed_csv: str, model_name: str):
     pipeline = pipeline_builder.build(strategy=None, model=model, sampler=None, selector=None)
     fitted = trainer.train(pipeline, train_X, train_y)
 
-    # 전략별 최적 threshold 적용
-    if strategy_id in STRATEGY_THRESHOLDS:
+    # use_optimization=True일 때만 최적 threshold 적용
+    if use_optimization and strategy_id in STRATEGY_THRESHOLDS:
         threshold = STRATEGY_THRESHOLDS[strategy_id]
         y_pred_proba = fitted.predict_proba(test_X)[:, 1]
         y_pred = (y_pred_proba >= threshold).astype(int)
     else:
         y_pred = fitted.predict(test_X)
+        threshold = None
 
     result = metrics.evaluate(test_y, y_pred)
     result["strategy"] = strategy_id
     result["model"] = model_name
-    if strategy_id in STRATEGY_THRESHOLDS:
+    if use_optimization and threshold is not None:
         result["threshold"] = threshold
     return result, fitted
 
@@ -65,6 +66,7 @@ def run_strategy(
     strategy_id: str,
     model_name: str = "lgbm",
     force_preprocess: bool = False,
+    use_optimization: bool = False,
 ):
     # CSV가 없으면 전략을 실행해 만들고, 있으면 그대로 재사용한다.
     processed_csv = ensure_processed_csv(strategy_id, force=force_preprocess)
@@ -80,6 +82,7 @@ def run_strategy(
             strategy_id=strategy_id,
             processed_csv=processed_csv,
             model_name=current_model,
+            use_optimization=use_optimization,
         )
         metrics.print_report(
             strategy_id,
@@ -112,17 +115,20 @@ def run(
     strategy_id: str,
     model_name: str = "lgbm",
     force_preprocess: bool = False,
+    use_optimization: bool = False,
 ):
     return run_strategy(
         strategy_id=strategy_id,
         model_name=model_name,
         force_preprocess=force_preprocess,
+        use_optimization=use_optimization,
     )
 
 
 def run_all(
     model_name: str = "lgbm",
     force_preprocess: bool = False,
+    use_optimization: bool = False,
 ):
     # 구현된 모든 전략에 대해 CSV 생성 여부를 먼저 맞춘다.
     ensure_processed_csvs(STRATEGIES, force=force_preprocess)
@@ -133,6 +139,7 @@ def run_all(
             strategy_id=strategy_id,
             model_name=model_name,
             force_preprocess=False,
+            use_optimization=use_optimization,
         )
         all_results.extend(strategy_results)
 
