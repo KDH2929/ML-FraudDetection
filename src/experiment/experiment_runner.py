@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from src.config import ARTIFACTS_DIR
+from src.config import ARTIFACTS_DIR, STRATEGY_THRESHOLDS, RANDOM_STATE
 from src.models.model_factory import get_model
 from src.pipeline import pipeline_builder, trainer
 from src.pipeline.data_loader import load_and_split
@@ -29,15 +29,35 @@ def _result_filename(strategy_id: str):
 def _run_single_model(strategy_id: str, processed_csv: str, model_name: str):
     train_X, test_X, train_y, test_y = load_and_split(str(processed_csv))
 
-    model = get_model(model_name)
+    # tuning 결과가 있으면 자동 로드
+    tuning_results_path = ARTIFACTS_DIR / f"{strategy_id}_tuning_results.json"
+    if tuning_results_path.exists() and model_name == "lgbm":
+        import lightgbm as lgb
+        with open(tuning_results_path, 'r', encoding='utf-8') as f:
+            tuning_results = json.load(f)
+        best_params = tuning_results['best_params']
+        model = lgb.LGBMClassifier(**best_params, random_state=RANDOM_STATE, verbosity=-1)
+        print(f"  [Using tuned params from {tuning_results_path.name}]")
+    else:
+        model = get_model(model_name)
+
     # 현재 공통 실행은 모델 비교까지만 담당하고, 세부 최적화는 수동으로 진행한다.
     pipeline = pipeline_builder.build(strategy=None, model=model, sampler=None, selector=None)
     fitted = trainer.train(pipeline, train_X, train_y)
 
-    y_pred = fitted.predict(test_X)
+    # 전략별 최적 threshold 적용
+    if strategy_id in STRATEGY_THRESHOLDS:
+        threshold = STRATEGY_THRESHOLDS[strategy_id]
+        y_pred_proba = fitted.predict_proba(test_X)[:, 1]
+        y_pred = (y_pred_proba >= threshold).astype(int)
+    else:
+        y_pred = fitted.predict(test_X)
+
     result = metrics.evaluate(test_y, y_pred)
     result["strategy"] = strategy_id
     result["model"] = model_name
+    if strategy_id in STRATEGY_THRESHOLDS:
+        result["threshold"] = threshold
     return result, fitted
 
 
