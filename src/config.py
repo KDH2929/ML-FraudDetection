@@ -41,3 +41,8 @@ MODEL_PARAMS = {
         "n_jobs": -1,
     },
 }
+
+# 전략별 최적 threshold (F1 maximization)
+STRATEGY_THRESHOLDS = {
+    "member_b_strategy_3": 0.3819,  # v3 optimized threshold
+}
