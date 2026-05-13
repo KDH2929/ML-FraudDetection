@@ -78,4 +78,6 @@ MODEL_PARAMS = {
 STRATEGY_THRESHOLDS = {
     "member_b_strategy_3": 0.3819,  # v3 optimized threshold
     "member_c_strategy_4": 0.4642899201825889,
+    "test_member_abc": 0.3109,
+    "member_a_strategy_4": 0.5135
 }
