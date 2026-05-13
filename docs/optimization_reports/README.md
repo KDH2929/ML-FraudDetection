@@ -7,6 +7,7 @@
 - [member_b_strategy_2_v2](./member_b_strategy_2_v2_report.md)
 - [member_b_v1](./member_b_v1_report.md)
 - [member_c_strategy_2_v2](./member_c_strategy_2_v2_report.md)
+- [member_c_strategy_3_v3](./member_c_strategy_3_v3_report.md)
 - [member_c_v1](./member_c_v1_report.md)
 
 
@@ -20,6 +21,7 @@
 # v2 실험 실행 + 보고서 자동 생성
 python run_experiment.py --strategy member_b_strategy_2 --model lgbm --generate-report --baseline member_b
 python run_experiment.py --strategy member_c_strategy_2 --model lgbm --generate-report --baseline member_c
+python run_experiment.py --strategy member_c_strategy_3 --model lgbm
 ```
 
 **옵션**:
