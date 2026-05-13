@@ -27,6 +27,14 @@ data/processed/*.csv
 artifacts/*.pkl
 artifacts/*.json
 artifacts/*.csv
+artifacts/*.png
+
+# Logs
+*.log
+*_log.txt
+
+# Model training logs
+catboost_info/
 
 # IDE
 .vscode/
