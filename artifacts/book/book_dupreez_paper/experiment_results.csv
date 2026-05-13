@@ -1,0 +1,2 @@
+recall_class1,f1_class1,f1_macro,strategy,model
+0.8819188191881919,0.9053030303030303,0.9482306486616832,book_dupreez_paper,lgbm

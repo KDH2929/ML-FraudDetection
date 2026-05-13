@@ -1,0 +1,2 @@
+recall_class1,f1_class1,f1_macro,strategy,model
+0.8782287822878229,0.8888888888888888,0.9391766268260292,book_pdf,lgbm

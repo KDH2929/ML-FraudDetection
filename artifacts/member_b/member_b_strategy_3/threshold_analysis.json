@@ -1,0 +1,44 @@
+{
+  "strategy_id": "member_b_strategy_3",
+  "lgbm_n_estimators": 500,
+  "best_threshold": 0.5838645781260291,
+  "default_performance": {
+    "recall": 0.6143911439114391,
+    "f1": 0.6224299065420561,
+    "precision": 0.6306818181818182
+  },
+  "optimized_performance": {
+    "recall": 0.5996309963099631,
+    "f1": 0.6360078277886497,
+    "precision": 0.6770833333333334
+  },
+  "improvement": {
+    "recall": -0.014760147601476037,
+    "f1": 0.013577921246593627,
+    "precision": 0.04640151515151514
+  },
+  "misclassification_analysis": {
+    "confusion_matrix": {
+      "TN": 5486,
+      "FP": 155,
+      "FN": 217,
+      "TP": 325
+    },
+    "fn_count": 217,
+    "fp_count": 155,
+    "fn_avg_proba": 0.18138695774179375,
+    "fp_avg_proba": 0.8195352374165558,
+    "fn_distinctive_features": {
+      "IS_OUTLIER_GRAPH2_DOC_PER_HOSP_LOWER": 4608294930.875576,
+      "IS_OUTLIER_ANOM_DMND_KURT_LOWER": 4608294930.875576,
+      "DEV2_DSAS_DMND_PERCENTILE_MAX": 2256.5163059588463,
+      "AMT2_DMND_CV": 2237.6381743793995,
+      "MED2_HOSP_10.0": 864.6719083493231,
+      "RESI_COST": 554.7749338249366,
+      "JPBASE_HSHD_INCM": 538.346179375786,
+      "MAXCRDT": 461.5185703703269,
+      "AMT2_NON_PAY_RATIO_STD": 382.4406140605275,
+      "AMT2_NON_PAY_RATIO_MAX": 278.5985124234519
+    }
+  }
+}
