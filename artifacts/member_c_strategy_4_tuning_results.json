@@ -1,0 +1,29 @@
+{
+  "best_params": {
+    "n_estimators": 308,
+    "learning_rate": 0.06506169329284166,
+    "num_leaves": 49,
+    "n_jobs": -1,
+    "verbose": -1,
+    "objective": "binary",
+    "metric": "binary_logloss",
+    "max_depth": 8,
+    "min_child_samples": 55,
+    "subsample": 0.6390473921440302,
+    "colsample_bytree": 0.7257264521185506,
+    "reg_alpha": 0.005983235144320162,
+    "reg_lambda": 0.40012494806946336,
+    "min_split_gain": 0.3253283252460562,
+    "scale_pos_weight": 10.04511752397245
+  },
+  "best_cv_recall": 0.6661176987263944,
+  "n_trials": 40,
+  "cv_folds": 5,
+  "source": "member_c_strategy_4_custom_tuning",
+  "optimize_metric": "f1_class1",
+  "best_cv_scores": {
+    "recall_class1": 0.6661176987263944,
+    "f1_class1": 0.6875205211861342,
+    "f1_macro": 0.8292912131535395
+  }
+}

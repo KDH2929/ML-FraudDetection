@@ -71,4 +71,5 @@ MODEL_PARAMS = {
 # 전략별 최적 threshold (F1 maximization)
 STRATEGY_THRESHOLDS = {
     "member_b_strategy_3": 0.3819,  # v3 optimized threshold
+    "member_c_strategy_4": 0.4642899201825889,
 }
