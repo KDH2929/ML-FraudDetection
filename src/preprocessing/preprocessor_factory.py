@@ -23,15 +23,15 @@ def _discover_strategy_modules():
         "book*_strategy*.py",
         "test*_strategy*.py",
     ):
-        for path in sorted(STRATEGY_DIR.glob(pattern)):
+        for path in sorted(STRATEGY_DIR.rglob(pattern)):
             if path.name.startswith("__"):
                 continue
-            modules.append(path.stem)
+            modules.append(".".join(path.relative_to(STRATEGY_DIR).with_suffix("").parts))
     return sorted(set(modules))
 
 
-def _load_strategy_class(module_stem: str):
-    module_name = f"src.preprocessing.strategies.{module_stem}"
+def _load_strategy_class(module_path: str):
+    module_name = f"src.preprocessing.strategies.{module_path}"
     module = importlib.import_module(module_name)
     classes = []
     for _, obj in inspect.getmembers(module, inspect.isclass):
@@ -55,9 +55,9 @@ def _load_strategy_class(module_stem: str):
 
 def _build_registry():
     registry = {}
-    for module_stem in _discover_strategy_modules():
-        strategy_id = _module_stem_to_strategy_id(module_stem)
-        registry[strategy_id] = _load_strategy_class(module_stem)
+    for module_path in _discover_strategy_modules():
+        strategy_id = _module_stem_to_strategy_id(module_path.split(".")[-1])
+        registry[strategy_id] = _load_strategy_class(module_path)
     return registry
 
 
@@ -65,7 +65,7 @@ STRATEGY_REGISTRY = _build_registry()
 
 
 def list_strategies():
-    return list(STRATEGY_REGISTRY.keys())
+    return sorted(STRATEGY_REGISTRY.keys())
 
 
 def get_strategy(strategy_id: str, **kwargs) -> BaseStrategy:
