@@ -41,8 +41,11 @@ def _run_single_model(strategy_id: str, processed_csv: str, model_name: str, use
             tuning_results = json.load(f)
         best_params = tuning_results["best_params"]
         merged = {**MODEL_PARAMS["lgbm"], **best_params}
+        # random_state, verbosity 확실히 설정 (중복 방지)
+        merged['random_state'] = RANDOM_STATE
+        merged['verbosity'] = -1
         print(f"  [Using tuned params from {tuning_results_path.name}]")
-        model = lgb.LGBMClassifier(**merged, random_state=RANDOM_STATE, verbosity=-1)
+        model = lgb.LGBMClassifier(**merged)
     else:
         model = get_model(model_name, scale_pos_weight=scale_pos_weight)
 
