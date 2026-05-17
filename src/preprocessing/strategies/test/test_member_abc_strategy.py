@@ -12,7 +12,7 @@ import pandas as pd
 
 from src.config import DIVIDED_SET_COL, ID_COL
 from src.preprocessing.strategies.base_strategy import BaseStrategy
-from src.preprocessing.strategies.member_a.member_a_strategy_4 import MemberA4Strategy
+from src.preprocessing.strategies.member_a.member_a_strategy_3 import MemberA4Strategy
 from src.preprocessing.strategies.member_b.member_b_strategy_3 import MemberB3Strategy
 from src.preprocessing.strategies.member_c.member_c_strategy_4 import MemberCStrategy4
 

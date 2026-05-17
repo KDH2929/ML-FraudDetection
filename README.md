@@ -39,6 +39,37 @@
 
 즉, 이 저장소는 "한 개의 모델 파이프라인"이라기보다, `A/B/C` 세 사람이 각자 전처리 전략을 실험하고 공통 러너 위에서 동일 기준으로 비교하는 실험 플랫폼에 가깝습니다.
 
+## 네이밍 정리 안내 (2026-05-13)
+
+`book/` 하위의 4개 전략 파일과 `member_a_strategy_4/_5` 출력 컬럼 접두어를 정직한 이름으로 정리했습니다.
+
+| 변경 전 | 변경 후 |
+| --- | --- |
+| `book_dupreez_paper_strategy.py`, ID `book_dupreez_paper`, 컬럼 `drz_*` | `book_claim_agg_strategy.py`, ID `book_claim_agg`, 컬럼 `claim_agg_*` |
+| `book_bauder_paper_strategy.py`, ID `book_bauder_paper`, 컬럼 `bdr_*` | `book_spec_peer_z_strategy.py`, ID `book_spec_peer_z`, 컬럼 `peer_z_*` |
+| `book_survey_paper_strategy.py`, ID `book_survey_paper`, 컬럼 `paper_*` | `book_cust_claim_strategy.py`, ID `book_cust_claim`, 컬럼 `cust_claim_*` |
+| `book_survey_paper_dedup_strategy.py`, ID `book_survey_paper_dedup` | `book_cust_claim_dedup_strategy.py`, ID `book_cust_claim_dedup` |
+
+`member_a_strategy_4`, `member_a_strategy_5`, `test_member_abc` 의 strategy ID와 파일명은 보존되었으나 출력 컬럼이 위 매핑에 따라 변경되었습니다. `MemberA5Strategy(skip_paper_drop=...)` 호출은 `skip_corr_drop` 으로 정리되었으며 `skip_paper_drop` 키워드는 deprecation alias 로 동작합니다.
+
+이로 인해 다음 산출물은 옛 컬럼명을 보유한 stale 상태입니다(필요 시 재생성).
+
+- `data/processed/member_a/member_a_strategy_4_preprocessed.csv`, `member_a_strategy_5_preprocessed.csv`
+- `data/processed/test/test_member_abc_preprocessed.csv`
+- `data/processed/book/book_*_preprocessed.csv` (옛 paper/dupreez/bauder/survey 명칭 파일들)
+- `artifacts/member_a/member_a_strategy_4/threshold_analysis.json`
+- `artifacts/test/test_member_abc/threshold_analysis.json`
+- `artifacts/summary/experiment_results.csv`, `artifacts/book/book_*paper*/experiment_results.csv`
+
+재생성 예시:
+
+```bash
+python -m src.experiment.experiment_runner --strategy test_member_abc --use-optimization
+python -m src.optimization.shared.threshold_optimizer --strategy test_member_abc
+python -m src.experiment.experiment_runner --strategy member_a_strategy_4 --use-optimization
+python -m src.optimization.shared.threshold_optimizer --strategy member_a_strategy_4
+```
+
 ## 성능 비교 요약
 
 아래 표는 현재 저장된 최신 보고서와 산출물 기준으로 정리한 요약입니다.

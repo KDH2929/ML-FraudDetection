@@ -1,0 +1,432 @@
+{
+  "v1": {
+    "strategy_id": "member_a",
+    "lgbm_top20": [
+      {
+        "feature": "mean_hosp_days",
+        "gain": 745
+      },
+      {
+        "feature": "MAX_PAYM_YM",
+        "gain": 631
+      },
+      {
+        "feature": "mean_hosp_dist",
+        "gain": 546
+      },
+      {
+        "feature": "sum_dmnd_amt",
+        "gain": 489
+      },
+      {
+        "feature": "RESI_COST",
+        "gain": 484
+      },
+      {
+        "feature": "AGE",
+        "gain": 483
+      },
+      {
+        "feature": "JPBASE_HSHD_INCM",
+        "gain": 463
+      },
+      {
+        "feature": "TOTALPREM",
+        "gain": 456
+      },
+      {
+        "feature": "MAX_PRM",
+        "gain": 454
+      },
+      {
+        "feature": "CTPR",
+        "gain": 409
+      },
+      {
+        "feature": "RCBASE_HSHD_INCM",
+        "gain": 368
+      },
+      {
+        "feature": "claim_cnt",
+        "gain": 343
+      },
+      {
+        "feature": "nunique_hosp",
+        "gain": 340
+      },
+      {
+        "feature": "CUST_RGST",
+        "gain": 327
+      },
+      {
+        "feature": "paym_rate",
+        "gain": 264
+      },
+      {
+        "feature": "CUST_INCM",
+        "gain": 252
+      },
+      {
+        "feature": "acci_pct_1",
+        "gain": 238
+      },
+      {
+        "feature": "sum_paym_amt",
+        "gain": 227
+      },
+      {
+        "feature": "OCCP_GRP_1",
+        "gain": 197
+      },
+      {
+        "feature": "acci_pct_3",
+        "gain": 197
+      }
+    ],
+    "lgbm_holdout_auc": 0.9019468035488721
+  },
+  "v2": {
+    "strategy_id": "member_a_strategy_2",
+    "lgbm_top20": [
+      {
+        "feature": "mean_hosp_days",
+        "gain": 692
+      },
+      {
+        "feature": "MAX_PAYM_YM",
+        "gain": 519
+      },
+      {
+        "feature": "mean_hosp_dist",
+        "gain": 449
+      },
+      {
+        "feature": "ma2_pca_2",
+        "gain": 437
+      },
+      {
+        "feature": "AGE",
+        "gain": 430
+      },
+      {
+        "feature": "RESI_COST",
+        "gain": 428
+      },
+      {
+        "feature": "ma2_kmeans_dist",
+        "gain": 417
+      },
+      {
+        "feature": "MAX_PRM",
+        "gain": 389
+      },
+      {
+        "feature": "JPBASE_HSHD_INCM",
+        "gain": 387
+      },
+      {
+        "feature": "TOTALPREM",
+        "gain": 386
+      },
+      {
+        "feature": "CTPR",
+        "gain": 366
+      },
+      {
+        "feature": "sum_dmnd_amt",
+        "gain": 326
+      },
+      {
+        "feature": "ma2_pca_1",
+        "gain": 325
+      },
+      {
+        "feature": "ma2_pca_0",
+        "gain": 325
+      },
+      {
+        "feature": "nunique_hosp",
+        "gain": 286
+      },
+      {
+        "feature": "RCBASE_HSHD_INCM",
+        "gain": 267
+      },
+      {
+        "feature": "claim_cnt",
+        "gain": 258
+      },
+      {
+        "feature": "CUST_RGST",
+        "gain": 251
+      },
+      {
+        "feature": "CUST_INCM",
+        "gain": 230
+      },
+      {
+        "feature": "paym_rate",
+        "gain": 210
+      }
+    ],
+    "lgbm_holdout_auc": 0.9010931431774873
+  },
+  "v3": {
+    "strategy_id": "member_a_strategy_3",
+    "lgbm_top20": [
+      {
+        "feature": "mean_hosp_days",
+        "gain": 653
+      },
+      {
+        "feature": "MAX_PAYM_YM",
+        "gain": 517
+      },
+      {
+        "feature": "ma3_std_dmnd_amt",
+        "gain": 480
+      },
+      {
+        "feature": "mean_hosp_dist",
+        "gain": 448
+      },
+      {
+        "feature": "MAX_PRM",
+        "gain": 392
+      },
+      {
+        "feature": "RESI_COST",
+        "gain": 390
+      },
+      {
+        "feature": "TOTALPREM",
+        "gain": 385
+      },
+      {
+        "feature": "AGE",
+        "gain": 382
+      },
+      {
+        "feature": "CTPR",
+        "gain": 355
+      },
+      {
+        "feature": "sum_dmnd_amt",
+        "gain": 334
+      },
+      {
+        "feature": "ma3_absdiff_hh_incm_est",
+        "gain": 297
+      },
+      {
+        "feature": "ma3_max_dmnd_amt",
+        "gain": 294
+      },
+      {
+        "feature": "JPBASE_HSHD_INCM",
+        "gain": 293
+      },
+      {
+        "feature": "nunique_hosp",
+        "gain": 281
+      },
+      {
+        "feature": "claim_cnt",
+        "gain": 268
+      },
+      {
+        "feature": "CUST_RGST",
+        "gain": 239
+      },
+      {
+        "feature": "RCBASE_HSHD_INCM",
+        "gain": 237
+      },
+      {
+        "feature": "ma3_max_nonpay_ratio",
+        "gain": 234
+      },
+      {
+        "feature": "acci_pct_1",
+        "gain": 216
+      },
+      {
+        "feature": "sum_paym_amt",
+        "gain": 206
+      }
+    ],
+    "lgbm_holdout_auc": 0.9054248971846216
+  },
+  "v4": {
+    "strategy_id": "member_a_strategy_4",
+    "lgbm_top20": [
+      {
+        "feature": "mean_hosp_days",
+        "gain": 337
+      },
+      {
+        "feature": "AGE",
+        "gain": 334
+      },
+      {
+        "feature": "cust_claim_first_claim_lag_m",
+        "gain": 325
+      },
+      {
+        "feature": "peer_z_paym_sum_spec",
+        "gain": 309
+      },
+      {
+        "feature": "mean_hosp_dist",
+        "gain": 268
+      },
+      {
+        "feature": "RESI_COST",
+        "gain": 256
+      },
+      {
+        "feature": "MAX_PRM",
+        "gain": 254
+      },
+      {
+        "feature": "claim_agg_vlid_std",
+        "gain": 246
+      },
+      {
+        "feature": "CTPR",
+        "gain": 245
+      },
+      {
+        "feature": "MAX_PAYM_YM",
+        "gain": 233
+      },
+      {
+        "feature": "cust_claim_tenure_m",
+        "gain": 225
+      },
+      {
+        "feature": "claim_agg_claim_intensity",
+        "gain": 225
+      },
+      {
+        "feature": "cust_claim_vlid_sum",
+        "gain": 223
+      },
+      {
+        "feature": "cust_claim_prem_incm_ratio",
+        "gain": 218
+      },
+      {
+        "feature": "TOTALPREM",
+        "gain": 215
+      },
+      {
+        "feature": "cust_claim_peer_paym_z",
+        "gain": 213
+      },
+      {
+        "feature": "ma3_absdiff_hh_incm_est",
+        "gain": 187
+      },
+      {
+        "feature": "claim_agg_paym_max_ratio",
+        "gain": 184
+      },
+      {
+        "feature": "claim_agg_dsas_top_share",
+        "gain": 181
+      },
+      {
+        "feature": "claim_agg_paym_cv",
+        "gain": 172
+      }
+    ],
+    "lgbm_holdout_auc": 0.919961981041544
+  },
+  "v5": {
+    "strategy_id": "member_a_strategy_5",
+    "lgbm_top20": [
+      {
+        "feature": "mean_hosp_days",
+        "gain": 444
+      },
+      {
+        "feature": "AGE",
+        "gain": 330
+      },
+      {
+        "feature": "peer_z_paym_sum_spec",
+        "gain": 327
+      },
+      {
+        "feature": "CTPR",
+        "gain": 284
+      },
+      {
+        "feature": "mean_hosp_dist",
+        "gain": 281
+      },
+      {
+        "feature": "RESI_COST",
+        "gain": 277
+      },
+      {
+        "feature": "claim_agg_vlid_std",
+        "gain": 259
+      },
+      {
+        "feature": "cust_claim_peer_paym_z",
+        "gain": 255
+      },
+      {
+        "feature": "MAX_PRM",
+        "gain": 246
+      },
+      {
+        "feature": "TOTALPREM",
+        "gain": 245
+      },
+      {
+        "feature": "claim_agg_claim_intensity",
+        "gain": 244
+      },
+      {
+        "feature": "MAX_PAYM_YM",
+        "gain": 235
+      },
+      {
+        "feature": "cust_claim_tenure_m",
+        "gain": 228
+      },
+      {
+        "feature": "ma3_absdiff_hh_incm_est",
+        "gain": 223
+      },
+      {
+        "feature": "claim_agg_vlid_max",
+        "gain": 213
+      },
+      {
+        "feature": "cust_claim_prem_incm_ratio",
+        "gain": 210
+      },
+      {
+        "feature": "claim_agg_paym_max_ratio",
+        "gain": 208
+      },
+      {
+        "feature": "claim_agg_paym_cv",
+        "gain": 205
+      },
+      {
+        "feature": "ma3_std_dmnd_amt",
+        "gain": 195
+      },
+      {
+        "feature": "JPBASE_HSHD_INCM",
+        "gain": 194
+      }
+    ],
+    "lgbm_holdout_auc": 0.9187930223567436
+  }
+}

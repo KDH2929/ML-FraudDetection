@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -9,6 +11,117 @@ from src.preprocessing.components.missing_value import GroupMeanImputer, MedianI
 from src.preprocessing.components.outlier import IQRCapper
 from src.preprocessing.components.scaler import RobustScalerWrapper
 from src.preprocessing.strategies.base_strategy import BaseStrategy
+from src.preprocessing.stage_cache import (
+    combined_fingerprint,
+    dataframe_fingerprint,
+    file_fingerprint,
+    load_or_build_stage,
+)
+
+
+_A_SHARED_CACHE_ID = "member_a_shared"
+_A1_SOURCE_FILES = (Path(__file__).resolve(),)
+
+
+def _source_fingerprint(paths: tuple[Path, ...]) -> str:
+    return combined_fingerprint(file_fingerprint(p) for p in paths)
+
+
+# 결측 자체가 MNAR 신호인 컬럼 2개만 유지:
+# - MATE_OCCP_GRP_1 (~52.8%): 결측 = 배우자 없음 (미혼/이혼/사별) — 구조적 MNAR
+# - MINCRDT        (~42.3%): 결측 = 신용 이력 없음 (금융 비주류 계층) — MNAR
+#   (MAXCRDT 는 MINCRDT 와 결측 행 완전 동일 → 중복 제거)
+# 나머지 제외 근거:
+#   MAX_PRM/MAX_PAYM_YM/TOTALPREM: MAR (상품 유형 조건부)
+#   WEDD_YN/CHLD_CNT/LTBN_CHLD_AGE: MCAR (수집 채널 오류, 2.1% 동일 비율)
+KEY_MISSING_COLS = (
+    "MATE_OCCP_GRP_1",
+    "MINCRDT",
+)
+
+
+def _add_key_missing_indicators(X: pd.DataFrame) -> pd.DataFrame:
+    """MNAR 확실한 2개 컬럼에만 IS_MISSING_* 지시변수 추가.
+
+    호출 위치: merge/drop 직후, imputation 이전. dtype은 모두 int(0/1).
+    누수 안전성: .isna() 만 사용하므로 train/test fitting 불필요.
+    """
+    out = X.copy()
+    for col in KEY_MISSING_COLS:
+        if col in out.columns:
+            out[f"IS_MISSING_{col}"] = out[col].isna().astype(int)
+    return out
+
+
+# 극단값 자체가 SIU 신호인 컬럼들 (도메인 직관 기반):
+# - 청구 건수/금액/병원수가 비정상적으로 높음 = SIU 의심
+# - 의사·진단명·과목 다양성이 비정상적으로 큼 = 다기관 doctor-shopping
+# - 청구 강도(단위시간 청구 횟수)가 비정상적 = 단기 burst
+# 캡핑은 하지 않고 IS_OUTLIER_*_HIGH 플래그만 추가 → 모델이 원본+플래그 결합 학습.
+# UPPER 만 표기 (LOWER 는 SIU 신호 아님 — 청구 적은 일반인).
+HIGH_SIGNAL_OUTLIER_COLS = (
+    # v1 baseline (claim_to_customer_table)
+    "claim_cnt",
+    "sum_dmnd_amt",
+    "nunique_hosp",
+    # v3 ma3_*
+    "ma3_max_dmnd_amt",
+    "ma3_max_nonpay_ratio",
+    "ma3_nunique_acci_dvsn",
+    # v4 claim_agg_*
+    "claim_agg_n_doc",
+    "claim_agg_dsas_nunique",
+    "claim_agg_hosp_switch_count",
+    "claim_agg_claim_intensity",
+)
+
+
+def _compute_upper_bounds(df: pd.DataFrame) -> dict[str, float]:
+    """HIGH_SIGNAL_OUTLIER_COLS 의 IQR upper bound (Q3 + 1.5*IQR) 사전 계산.
+
+    NaN 은 분위수 계산에서 자연 제외됨. 데이터에 없는 컬럼은 dict 에서 누락.
+    """
+    bounds: dict[str, float] = {}
+    for col in HIGH_SIGNAL_OUTLIER_COLS:
+        if col not in df.columns:
+            continue
+        num = pd.to_numeric(df[col], errors="coerce")
+        q1 = num.quantile(0.25)
+        q3 = num.quantile(0.75)
+        if pd.isna(q1) or pd.isna(q3):
+            continue
+        iqr = q3 - q1
+        bounds[col] = float(q3 + 1.5 * iqr)
+    return bounds
+
+
+def _apply_upper_outlier_flags(df: pd.DataFrame, bounds: dict[str, float]) -> pd.DataFrame:
+    """주어진 upper bound 로 IS_OUTLIER_<col>_HIGH 플래그 컬럼 추가."""
+    out = df.copy()
+    for col, hi in bounds.items():
+        if col not in out.columns:
+            continue
+        num = pd.to_numeric(out[col], errors="coerce")
+        out[f"IS_OUTLIER_{col}_HIGH"] = (num > hi).fillna(False).astype(int)
+    return out
+
+
+def _add_high_signal_outlier_flags(X: pd.DataFrame) -> pd.DataFrame:
+    """단일 preprocess 경로: 전체 X 로 IQR 적합 후 IS_OUTLIER_*_HIGH 플래그 추가.
+
+    원본 컬럼은 캡핑하지 않음. 플래그는 binary(0/1).
+    호출 위치: imputation 직후, IQRCapper(NUM_COLS 캡핑) 직전.
+    """
+    bounds = _compute_upper_bounds(X)
+    return _apply_upper_outlier_flags(X, bounds)
+
+
+def _add_high_signal_outlier_flags_train_test(
+    tr: pd.DataFrame, te: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """train/test 경로: train 으로만 IQR 적합, test 에 동일 bound 적용 (누수 방지)."""
+    bounds = _compute_upper_bounds(tr)
+    return _apply_upper_outlier_flags(tr, bounds), _apply_upper_outlier_flags(te, bounds)
 
 
 def _y_to_float01(y: pd.Series) -> pd.Series:
@@ -106,6 +219,42 @@ def _drop_unused_cust_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=drops)
 
 
+def _build_member_a_raw_features(
+    X: pd.DataFrame,
+    claim_df: pd.DataFrame | None,
+) -> pd.DataFrame:
+    """Build the shared v1 raw feature frame before fitted transforms."""
+    X_out = _merge_claim_features(X, claim_df)
+    X_out = _drop_unused_cust_columns(X_out)
+    X_out = _add_key_missing_indicators(X_out)
+    return X_out
+
+
+def _load_or_build_member_a_raw_features(
+    X: pd.DataFrame,
+    claim_df: pd.DataFrame | None,
+    *,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    if not use_cache:
+        return _build_member_a_raw_features(X, claim_df)
+
+    fp = combined_fingerprint(
+        (
+            "a1_raw_features_v1",
+            dataframe_fingerprint(X),
+            dataframe_fingerprint(claim_df),
+            _source_fingerprint(_A1_SOURCE_FILES),
+        )
+    )
+    return load_or_build_stage(
+        strategy_id=_A_SHARED_CACHE_ID,
+        stage_name="a1_raw_features",
+        fingerprint=fp,
+        builder=lambda: _build_member_a_raw_features(X, claim_df),
+    )
+
+
 def _fill_residual_missing_for_ml(X: pd.DataFrame) -> pd.DataFrame:
     """processed_data 검증: ID 제외 모든 열을 float로. 수치=중앙값 대치, 그 외=숫자 파싱 또는 factorize."""
     out = X.copy()
@@ -143,8 +292,10 @@ class MemberAStrategy(BaseStrategy):
         y: pd.Series,
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
-        X_out = _merge_claim_features(X, claim_df)
-        X_out = _drop_unused_cust_columns(X_out)
+        X_out = _load_or_build_member_a_raw_features(X, claim_df)
+
+        # --- 1.5) 결측 지시변수: 결측 자체가 신호인 컬럼들 (imputation 이전에 캡처) ---
+        X_out = _add_key_missing_indicators(X_out)
 
         # --- 2) 도메인 특수값 (집값 0 = 추정 불가 → 결측으로 두고 아래에서 채움) ---
         if "RESI_COST" in X_out.columns:
@@ -190,6 +341,10 @@ class MemberAStrategy(BaseStrategy):
             te.fit(X_out, y01)
             X_out = te.transform(X_out)
 
+        # 참고: 도메인 이상치 플래그 (`_add_high_signal_outlier_flags`) 는 helper 로 남겨뒀지만
+        # LightGBM 이 split 으로 임계값을 학습하므로 redundant — F1 평가에서 5개 버전 모두 하락 확인됨.
+        # 호출은 비활성. 실험 시 헬퍼를 직접 끼워 쓰면 됨.
+
         # --- 7) 이상치: 설정된 수치형만 IQR로 캡 ---
         iqr_cols = [c for c in NUM_COLS if c in X_out.columns]
         if iqr_cols:
@@ -221,6 +376,10 @@ class MemberAStrategy(BaseStrategy):
         te = _merge_claim_features(X_test, claim_df)
         tr = _drop_unused_cust_columns(tr)
         te = _drop_unused_cust_columns(te)
+
+        # 결측 지시변수: imputation 이전, train/test 동일 규칙으로 적용 (.isna() 만 사용)
+        tr = _add_key_missing_indicators(tr)
+        te = _add_key_missing_indicators(te)
 
         for Xs in (tr, te):
             if "RESI_COST" in Xs.columns:
@@ -264,6 +423,8 @@ class MemberAStrategy(BaseStrategy):
             te_enc.fit(tr, y01)
             tr = te_enc.transform(tr)
             te = te_enc.transform(te)
+
+        # 참고: `_add_high_signal_outlier_flags_train_test` 도 비활성 (위의 사유 동일).
 
         iqr_cols = [c for c in NUM_COLS if c in tr.columns]
         if iqr_cols:

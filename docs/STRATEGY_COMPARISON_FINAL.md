@@ -11,7 +11,7 @@
 | 전략 | 설명 | Feature 수 | 최적화 | 상태 |
 |------|------|-----------|--------|------|
 | **test_member_abc** | A4 + B3 + C4 병합 (CorrelationRemover 제거) | 295 | ✅ Threshold | 🏆 **최고** |
-| **Member A v4** | 기본 집계 + GroupMean + 논문 Feature | ? | ✅ Threshold | ✅ 완료 |
+| **Member A v4** | 기본 집계 + GroupMean + 청구 행동 추가 블록 | ? | ✅ Threshold | ✅ 완료 |
 | **Member B v3** | Deviation + Network + Feature Selection | 100 | ✅ Threshold | ✅ 완료 |
 | **Member C v4** | 고객-청구 집계 + 다양성 | 190 | ✅ Threshold | ✅ 완료 |
 
@@ -247,7 +247,7 @@ Member B v3:      F1 0.6165 (Recall 0.4914)
 
 ### 4. Feature 다양성의 힘
 ```
-Member A: 그룹 통계 + 논문 기반 Feature
+Member A: 그룹 통계 + 청구 행동 집계 (claim_agg / peer_z / cust_claim)
 Member B: 네트워크 + 이상치 + 시계열
 Member C: 고객-청구 집계 + 다양성
 
@@ -304,7 +304,7 @@ F1 Score:  0.6310
 ```
 Recall:    0.6049
 F1 Score:  0.6256
-용도:      논문 기반 Feature 검증 시
+용도:      청구 행동 추가 블록 검증 시
 ```
 
 #### Member B v3

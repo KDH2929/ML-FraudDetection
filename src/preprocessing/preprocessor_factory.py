@@ -9,7 +9,7 @@ STRATEGY_DIR = Path(__file__).resolve().parent / "strategies"
 
 
 def _module_stem_to_strategy_id(stem: str) -> str:
-    # foo_bar_strategy.py → foo_bar (예: member_a_strategy, book_survey_paper_strategy).
+    # foo_bar_strategy.py → foo_bar (예: member_a_strategy, book_cust_claim_strategy).
     # member_b_strategy_2.py 처럼 `_strategy`로 끝나지 않으면 stem 전체가 ID(동료 버전 파일).
     if stem.endswith("_strategy"):
         return stem[: -len("_strategy")]

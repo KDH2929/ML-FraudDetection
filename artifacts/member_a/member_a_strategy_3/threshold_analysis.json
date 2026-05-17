@@ -1,0 +1,44 @@
+{
+  "strategy_id": "member_a_strategy_3",
+  "lgbm_n_estimators": 200,
+  "best_threshold": 0.6821639807989595,
+  "default_performance": {
+    "recall": 0.7121771217712177,
+    "f1": 0.5594202898550724,
+    "precision": 0.4606205250596659
+  },
+  "optimized_performance": {
+    "recall": 0.6070110701107011,
+    "f1": 0.5797356828193833,
+    "precision": 0.554806070826307
+  },
+  "improvement": {
+    "recall": -0.10516605166051662,
+    "f1": 0.02031539296431084,
+    "precision": 0.09418554576664107
+  },
+  "misclassification_analysis": {
+    "confusion_matrix": {
+      "TN": 5377,
+      "FP": 264,
+      "FN": 213,
+      "TP": 329
+    },
+    "fn_count": 213,
+    "fp_count": 264,
+    "fn_avg_proba": 0.3118287837456637,
+    "fp_avg_proba": 0.8358728518159119,
+    "fn_distinctive_features": {
+      "JPBASE_HSHD_INCM": 20844.506404053234,
+      "ma3_max_nonpay_ratio": 1008.0842067106172,
+      "TOTALPREM": 374.4489504899015,
+      "RESI_COST": 243.66406105529998,
+      "MAX_PRM": 178.65125047082208,
+      "CUST_INCM": 161.39396684773038,
+      "claim_cnt": 60.64464190590899,
+      "nunique_hosp": 60.307109232575094,
+      "is_heed_hosp": 57.22643550732931,
+      "sum_paym_amt": 56.143788967979106
+    }
+  }
+}

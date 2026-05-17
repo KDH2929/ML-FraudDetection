@@ -12,8 +12,8 @@
 | **v1** | ? | 기본 집계 + GroupMean | ❌ | ✅ 완료 |
 | **v2** | v1 + α | v1 + KMeans·PCA | ❌ | ✅ 완료 |
 | **v3** | v1 + β | v1 + 도메인 집계·SIU 노출 | ❌ | ✅ 완료 |
-| **v4** | v3 + 논문 | v3 + 논문 파생 (du Preez, Bauder, Survey) | ❌ | ⚠️ 결측치 오류 |
-| **v5** | v4 축소 | v4 + paper 다중공선성 축소 + 선택적 VIF·필터·RFE | ⚠️ 선택 | ✅ 완료 |
+| **v4** | v3 + 추가 블록 | v3 + 청구 집계(claim_agg) / 동료과목 Z(peer_z) / 고객청구(cust_claim) | ❌ | ⚠️ 결측치 오류 |
+| **v5** | v4 축소 | v4 + cust_claim_* 다중공선성 축소 + 선택적 VIF·필터·RFE | ⚠️ 선택 | ✅ 완료 |
 
 ---
 
@@ -162,49 +162,50 @@ v1 파이프라인에 도메인 지식 기반 집계와 SIU(사기) 노출 변�
 
 ---
 
-### Member A v4 (논문 파생 추가)
+### Member A v4 (청구 행동 추가 블록)
 
 #### v3 대비 추가 사항
 
 **설계 철학**
 ```
-"A4: v3 + 논문 파생(dupreez drz / bauder bdr / survey paper)"
+"A4: v3 + claim_agg / peer_z / cust_claim"
 ```
 
-v3 위에 문헌 고찰 기반 파생 변수를 추가. 학술 연구에서 검증된 사기 탐지 Feature를 적용.
+v3 위에 청구 데이터에서 직접 계산할 수 있는 일반적인 집계·동료 비교 Z-score·고객 청구 행동 블록 3종을 라벨 미사용으로 추가.
 
 #### 신규 Feature Blocks
 
-1. **du Preez et al. (2025) - `drz_*`**
+1. **청구 일반 집계 - `claim_agg_*`**
    ```python
-   _dupreez_claim_insight_features(claim_df)
-   # CLAIM-only 문헌고찰식 파생변수
+   _claim_aggregation_features(claim_df)
+   # 청구 건수, 다기관/다의사 노출, 지급 평균/std/max,
+   # 진단·과목 다양도, 시간 밀도, 병원 전환수 등
    ```
 
-2. **Bauder - `bdr_*`**
+2. **동료 과목 Z-score - `peer_z_*`**
    ```python
-   _bauder_within_spec_peer_z(claim_df, meta)
-   # 동일 과목 내 Z-score (라벨 미사용)
+   _within_spec_peer_z(claim_df, meta)
+   # HOSP_SPEC_DVSN(병원 과목) 동일 집단 내 Z-score (라벨 미사용)
    ```
 
-3. **Survey Paper - `paper_*`**
+3. **고객·청구 행동 - `cust_claim_*`**
    ```python
-   _paper_survey_block(claim_df, paper_meta, peer_frame)
-   # paper_meta, peer_frame 기반
+   _customer_claim_block(claim_df, cust_meta, peer_frame)
+   # 고객 단위 청구·지급 요약, 가입~관측 기간, 시간창(6m / 6-12m / 12m+) 강도
    
-   _paper_survey_customer_addons(X_out)
+   _customer_addons(X_out)
    # GroupMeanImputer 이후 추가
-   # - paper_prem_incm_ratio
-   # - paper_incm_missing_or_zero
+   # - cust_claim_prem_incm_ratio
+   # - cust_claim_incm_missing_or_zero
    ```
 
 #### 통합 방식
 ```python
-def _merge_paper_blocks(X, claim_df):
-    drz = _dupreez_claim_insight_features(claim_df)
-    bdr = _bauder_within_spec_peer_z(claim_df, meta_b)
-    surv = _paper_survey_block(claim_df, paper_meta, peer_frame)
-    return drz, bdr, surv
+def _merge_extra_blocks(X, claim_df):
+    claim_agg = _claim_aggregation_features(claim_df)
+    peer_z = _within_spec_peer_z(claim_df, meta_peer)
+    cust_claim = _customer_claim_block(claim_df, cust_meta, peer_frame)
+    return claim_agg, peer_z, cust_claim
 ```
 
 #### 튜닝
@@ -219,9 +220,9 @@ ValueError: member_a 전처리 데이터에 결측치가 남아 있습니다
 - MATE_OCCP_GRP_2: 11,827개
 ```
 
-**원인**: `OCCP_GRP_2`, `MATE_OCCP_GRP_2`는 v1부터 `_UNUSED_CUST_FOR_A_PIPELINE`에 포함되어 제거되어야 하나, 논문 블록에서 재생성되었을 가능성
+**원인**: `OCCP_GRP_2`, `MATE_OCCP_GRP_2`는 v1부터 `_UNUSED_CUST_FOR_A_PIPELINE`에 포함되어 제거되어야 하나, 추가 블록에서 재생성되었을 가능성
 
-**해결 필요**: ModeImputer 적용 또는 논문 블록에서 해당 변수 생성 확인
+**해결 필요**: ModeImputer 적용 또는 추가 블록에서 해당 변수 생성 확인
 
 ---
 
@@ -231,25 +232,25 @@ ValueError: member_a 전처리 데이터에 결측치가 남아 있습니다
 
 **설계 철학**
 ```
-"A5: A4 + paper_* 다중공선성 드롭만 (지표가 잘 나오는 얇은 확장)"
+"A5: A4 + cust_claim_* 다중공선성 드롭만 (지표가 잘 나오는 얇은 확장)"
 ```
 
-v4의 paper 변수들이 다중공선성을 일으킬 수 있어, 이를 축소하고 선택적으로 Feature Selection을 적용.
+v4의 cust_claim_* 변수들이 다중공선성을 일으킬 수 있어, 이를 축소하고 선택적으로 Feature Selection을 적용.
 
 #### 기본 모드 (default)
 ```python
 MemberA5Strategy(
     advanced_feature_selection=False,
     top_k=None,
-    skip_paper_drop=False
+    skip_corr_drop=False
 )
 ```
 
 1. **v4 실행**
-2. **paper 다중공선성 드롭**
+2. **cust_claim_* 다중공선성 드롭**
    ```python
-   _drop_paper_multicollinearity(df)
-   # _PAPER_DROP_FOR_MULTICOLLINEARITY 변수 제거
+   _drop_for_multicollinearity(df)
+   # _DROP_FOR_MULTICOLLINEARITY 변수 제거
    ```
 
 #### LightGBM top-k 모드
@@ -286,11 +287,11 @@ MemberA5Strategy(advanced_feature_selection=True)
 
 #### 실험 조합
 
-| 조합 | skip_paper_drop | top_k | 설명 |
+| 조합 | skip_corr_drop | top_k | 설명 |
 |------|----------------|-------|------|
-| A5 기본 | False | None | v4 + paper dedup |
+| A5 기본 | False | None | v4 + cust_claim dedup |
 | A4 + top_k | True | 100 | v4 그대로 + LightGBM top-100 |
-| A5 + top_k | False | 100 | v4 + paper dedup + LightGBM top-100 |
+| A5 + top_k | False | 100 | v4 + cust_claim dedup + LightGBM top-100 |
 
 #### 튜닝
 ```bash
@@ -313,12 +314,12 @@ python -m src.optimization.hyperparameter_tuner --strategy member_a_strategy_5
 - ⚠️ **누수 방지**: SIU 변수는 train_test 경로에서만 활성화
 
 ### v3 → v4
-- ➕ **논문 파생**: du Preez, Bauder, Survey paper
-- ➕ **학술 검증**: 문헌에서 검증된 Feature
+- ➕ **추가 블록**: claim_agg / peer_z / cust_claim 3종
+- ➕ **라벨 미사용**: 동료 비교는 train-only μ·σ
 - ❌ **문제 발생**: 결측치 오류 (OCCP_GRP_2)
 
 ### v4 → v5
-- ➖ **다중공선성 축소**: paper_* 변수 정리
+- ➖ **다중공선성 축소**: cust_claim_* 변수 정리
 - ➕ **선택적 Feature Selection**: LightGBM top-k, VIF·필터·RFE
 - ⚙️ **실험 모드**: 3가지 조합 (A5 기본, A4+top_k, A5+top_k)
 
@@ -345,7 +346,7 @@ python -m src.optimization.hyperparameter_tuner --strategy member_a_strategy_5
 ```python
 from src.preprocessing.strategies.member_a.member_a_strategy_5 import MemberA5Strategy
 
-strategy = MemberA5Strategy()  # paper dedup만
+strategy = MemberA5Strategy()  # cust_claim dedup만
 ```
 
 ### 2순위: Member A v5 (top_k)
@@ -374,7 +375,7 @@ strategy = MemberA3Strategy()
 ### 즉시
 1. **v4 결측치 문제 해결**
    - OCCP_GRP_2, MATE_OCCP_GRP_2 확인
-   - ModeImputer 적용 또는 논문 블록 수정
+   - ModeImputer 적용 또는 추가 블록 수정
 
 2. **v5 성능 측정**
    ```bash
@@ -390,7 +391,7 @@ strategy = MemberA3Strategy()
 
 4. **v3, v5 비교**
    - v3 (도메인 집계)
-   - v5 (도메인 + 논문 + dedup)
+   - v5 (도메인 + 추가 블록 + dedup)
 
 ### 중기
 5. **top_k 실험**
@@ -414,7 +415,7 @@ Member A 전략은 **체계적인 결측치 처리**와 **점진적 Feature 확�
    - v1: 기본 (결측·인코딩·스케일)
    - v2: 비지도 학습
    - v3: 도메인 지식
-   - v4: 학술 검증
+   - v4: 청구 행동 기반 추가 블록
    - v5: 최적화·선택
 
 3. **결측치 체계**

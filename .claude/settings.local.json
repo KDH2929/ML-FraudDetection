@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\KDH\\\\Documents\\\\VisualStudio Code\\\\CatchCatch\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)"
+    ]
+  }
+}

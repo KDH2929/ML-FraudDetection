@@ -1,13 +1,12 @@
 """
-6장 book_pdf 파이프라인 동일 + 원 논문식 블록 1개.
+6장 book_pdf 파이프라인 동일 + 동일 과목 내 동료 비교 Z-score 블록.
 
-원 논문(예: Bauder & Khoshgoftaar, J Big Data 2018; 관련 Medicare 사기·이상치 연구)에서
-반복되는 아이디어 중 하나는 **동일 전문과(또는 동일 집단) 안에서의 상대적 이탈**을 보는 것이다.
-데이터에 맞게 `HOSP_SPEC_DVSN`(병원 과목) 최빈값으로 고객을 집단에 넣고,
-DIVIDED_SET==1 구간에서 동일 집단 내 **지급액 합·청구 건수·병원 수**의 평균·표준편차를 구한 뒤
-고객 단위 Z-score(`bdr_*`)로 붙인다. (라벨은 동료 통계에 사용하지 않는다.)
+데이터에 맞게 `HOSP_SPEC_DVSN`(병원 과목) 최빈값으로 고객을 동료 집단에 넣고,
+DIVIDED_SET==1 구간에서 동일 집단 내 **지급액 합·청구 건수·병원 수**의 평균·
+표준편차를 구한 뒤 고객 단위 Z-score(`peer_z_*`)로 붙인다. 동료 통계 산출에
+라벨은 사용하지 않는다(전 구간 train-only μ·σ).
 
-실험 CLI ID: book_bauder_paper
+실험 CLI ID: book_spec_peer_z
 """
 
 from __future__ import annotations
@@ -38,7 +37,7 @@ def _modal_value(s: pd.Series) -> object:
     return m.iloc[0] if len(m) else np.nan
 
 
-def _bauder_within_spec_peer_z(
+def _within_spec_peer_z(
     claim_df: pd.DataFrame | None,
     meta: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -88,9 +87,9 @@ def _bauder_within_spec_peer_z(
     tr = merged.loc[tr_mask & merged["_spec_mode"].notna()].copy()
     if tr.empty:
         out = cust[[ID_COL]].copy()
-        out["bdr_paym_sum_z_spec"] = 0.0
-        out["bdr_claim_count_z_spec"] = 0.0
-        out["bdr_n_hosp_z_spec"] = 0.0
+        out["peer_z_paym_sum_spec"] = 0.0
+        out["peer_z_claim_count_spec"] = 0.0
+        out["peer_z_n_hosp_spec"] = 0.0
         return out
 
     def _z_cols(group_col: str, value_cols: list[str], prefix: str) -> pd.DataFrame:
@@ -105,17 +104,22 @@ def _bauder_within_spec_peer_z(
             out_z[f"{prefix}{vc}_z"] = ((wide[vc] - mu) / (sd + 1e-6)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         return out_z
 
-    zpay = _z_cols("_spec_mode", ["_paym_sum"], "bdr_")
-    zpay = zpay.rename(columns={"bdr__paym_sum_z": "bdr_paym_sum_z_spec"})
+    zpay = _z_cols("_spec_mode", ["_paym_sum"], "peer_z_")
+    zpay = zpay.rename(columns={"peer_z__paym_sum_z": "peer_z_paym_sum_spec"})
 
-    zct = _z_cols("_spec_mode", ["_n_claim"], "bdr_")
-    zct = zct.rename(columns={"bdr__n_claim_z": "bdr_claim_count_z_spec"})
+    zct = _z_cols("_spec_mode", ["_n_claim"], "peer_z_")
+    zct = zct.rename(columns={"peer_z__n_claim_z": "peer_z_claim_count_spec"})
 
-    zh = _z_cols("_spec_mode", ["_n_hosp"], "bdr_")
-    zh = zh.rename(columns={"bdr__n_hosp_z": "bdr_n_hosp_z_spec"})
+    zh = _z_cols("_spec_mode", ["_n_hosp"], "peer_z_")
+    zh = zh.rename(columns={"peer_z__n_hosp_z": "peer_z_n_hosp_spec"})
 
-    out = cust[[ID_COL]].merge(zpay, on=ID_COL, how="left").merge(zct, on=ID_COL, how="left").merge(zh, on=ID_COL, how="left")
-    for c in ("bdr_paym_sum_z_spec", "bdr_claim_count_z_spec", "bdr_n_hosp_z_spec"):
+    out = (
+        cust[[ID_COL]]
+        .merge(zpay, on=ID_COL, how="left")
+        .merge(zct, on=ID_COL, how="left")
+        .merge(zh, on=ID_COL, how="left")
+    )
+    for c in ("peer_z_paym_sum_spec", "peer_z_claim_count_spec", "peer_z_n_hosp_spec"):
         if c in out.columns:
             out[c] = pd.to_numeric(out[c], errors="coerce").fillna(0.0)
         else:
@@ -123,10 +127,10 @@ def _bauder_within_spec_peer_z(
     return out
 
 
-class BookBauderPaperStrategy(BaseStrategy):
+class BookSpecPeerZStrategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
-        return "6장 3절 PDF 동일 + Bauder류 동일과목(HOSP_SPEC) 동료 Z-score bdr_*"
+        return "6장 3절 PDF 동일 + 동일 과목(HOSP_SPEC) 동료 Z-score peer_z_*"
 
     def preprocess(
         self,
@@ -207,10 +211,10 @@ class BookBauderPaperStrategy(BaseStrategy):
                 X_out[new_cols] = X_out[new_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
 
         if meta_peer is not None:
-            bdr = _bauder_within_spec_peer_z(claim_df, meta_peer)
-            if not bdr.empty:
-                X_out = X_out.merge(bdr, on=ID_COL, how="left")
-                for c in ("bdr_paym_sum_z_spec", "bdr_claim_count_z_spec", "bdr_n_hosp_z_spec"):
+            peer_z = _within_spec_peer_z(claim_df, meta_peer)
+            if not peer_z.empty:
+                X_out = X_out.merge(peer_z, on=ID_COL, how="left")
+                for c in ("peer_z_paym_sum_spec", "peer_z_claim_count_spec", "peer_z_n_hosp_spec"):
                     if c in X_out.columns:
                         X_out[c] = pd.to_numeric(X_out[c], errors="coerce").fillna(0.0)
 

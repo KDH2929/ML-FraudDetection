@@ -1,15 +1,14 @@
 """
-『머신러닝을 이용한 데이터 분석』 6장 3절(book_pdf)과 동일한 전처리 뒤,
-du Preez et al., Artificial Intelligence in Medicine (2025) systematic review
-(의료비·보험 사기·FWA 탐지 문헌고찰에서 반복되는 청구·이용 패턴)에서 뽑은
-**청구(CLAIM)만**으로 계산한 고객 단위 파생 `drz_*` 열을 추가한다.
+허진경, 『머신러닝을 이용한 데이터 분석』 6장 3절(book_pdf)과 동일한 전처리 뒤,
+청구(CLAIM) 데이터에서 직접 계산할 수 있는 일반적인 고객 단위 집계 파생
+`claim_agg_*` 열을 추가한다.
 
-- `drz_*`는 라벨 y를 쓰지 않는다(문헌에서 강조되는 다기관·시간 밀도·진단/과목
-  다양도·지급/청구 이질성·거리·유의병원 비중 등의 프록시).
+- `claim_agg_*` 는 라벨 y 를 사용하지 않는다(다기관·시간 밀도·진단/과목 다양도·
+  지급/청구 이질성·거리·유의병원 비중 등 청구 행동 지표).
 - 책 PDF 재현용 CLAIM 파생(`CLAIM_COUNT`, SIU 비율 등)은 `book_pdf_strategy`
-  의 `_book_claim_block`과 동일하게 유지한다.
+  의 `_book_claim_block` 과 동일하게 유지한다.
 
-실험 CLI ID: book_dupreez_paper
+실험 CLI ID: book_claim_agg
 """
 
 from __future__ import annotations
@@ -181,8 +180,14 @@ def _dsas_top_share(s: pd.Series) -> float:
     return float(vc.iloc[0] / len(s))
 
 
-def _dupreez_claim_insight_features(claim_df: pd.DataFrame | None) -> pd.DataFrame:
-    """du Preez et al. (2025) 문헌고찰 요지를 CLAIM만으로 근사한 고객 단위 특징."""
+def _claim_aggregation_features(claim_df: pd.DataFrame | None) -> pd.DataFrame:
+    """청구 데이터에서 라벨 없이 계산 가능한 고객 단위 집계 파생.
+
+    포함되는 시그널: 청구 건수, 다기관/다의사 노출, 지급액 평균·표준편차·최대,
+    지급/청구 spread, 진단·사고구분·과목 다양도, 유의병원 비중, 입원일수 분포,
+    집-병원 평균 거리, 청구 강도(시간 밀도), 병원 전환 횟수, 청구 간격 통계,
+    같은 주 다기관 방문 등.
+    """
     if claim_df is None or len(claim_df) == 0 or ID_COL not in claim_df.columns:
         return pd.DataFrame()
 
@@ -194,13 +199,15 @@ def _dupreez_claim_insight_features(claim_df: pd.DataFrame | None) -> pd.DataFra
     cl[ID_COL] = cl[ID_COL].astype(int)
 
     g = cl.groupby(ID_COL, sort=False)
-    base = g.size().to_frame("drz_n_claims")
+    base = g.size().to_frame("claim_agg_n_claims")
 
     if "HOSP_CODE" in cl.columns:
-        base["drz_n_hosp"] = g["HOSP_CODE"].nunique()
-        base["drz_n_hosp_per_10_claims"] = base["drz_n_hosp"] / (base["drz_n_claims"].replace(0, np.nan)) * 10.0
+        base["claim_agg_n_hosp"] = g["HOSP_CODE"].nunique()
+        base["claim_agg_n_hosp_per_10_claims"] = (
+            base["claim_agg_n_hosp"] / (base["claim_agg_n_claims"].replace(0, np.nan)) * 10.0
+        )
     if "CHME_LICE_NO" in cl.columns:
-        base["drz_n_doc"] = g["CHME_LICE_NO"].nunique()
+        base["claim_agg_n_doc"] = g["CHME_LICE_NO"].nunique()
 
     if "PAYM_AMT" in cl.columns:
         cl["_paym"] = pd.to_numeric(cl["PAYM_AMT"], errors="coerce")
@@ -208,41 +215,41 @@ def _dupreez_claim_insight_features(claim_df: pd.DataFrame | None) -> pd.DataFra
         mn = gp.mean()
         sd = gp.std()
         mx = gp.max()
-        base["drz_paym_sum"] = gp.sum()
-        base["drz_paym_cv"] = (sd / mn.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan)
-        base["drz_paym_max_ratio"] = mx / (mn + 1e-6)
+        base["claim_agg_paym_sum"] = gp.sum()
+        base["claim_agg_paym_cv"] = (sd / mn.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan)
+        base["claim_agg_paym_max_ratio"] = mx / (mn + 1e-6)
 
     if "DMND_AMT" in cl.columns and "PAYM_AMT" in cl.columns:
         cl["_dmnd"] = pd.to_numeric(cl["DMND_AMT"], errors="coerce")
         if "_paym" not in cl.columns:
             cl["_paym"] = pd.to_numeric(cl["PAYM_AMT"], errors="coerce")
         cl["_spread"] = cl["_dmnd"].fillna(0.0) - cl["_paym"].fillna(0.0)
-        base["drz_dmnd_paym_spread_mean"] = cl.groupby(ID_COL, sort=False)["_spread"].mean()
+        base["claim_agg_dmnd_paym_spread_mean"] = cl.groupby(ID_COL, sort=False)["_spread"].mean()
 
     if "DSAS_NAME" in cl.columns:
-        base["drz_dsas_nunique"] = g["DSAS_NAME"].nunique()
-        base["drz_dsas_top_share"] = g["DSAS_NAME"].apply(_dsas_top_share)
+        base["claim_agg_dsas_nunique"] = g["DSAS_NAME"].nunique()
+        base["claim_agg_dsas_top_share"] = g["DSAS_NAME"].apply(_dsas_top_share)
 
     if "ACCI_DVSN" in cl.columns:
-        base["drz_acci_nunique"] = g["ACCI_DVSN"].nunique()
+        base["claim_agg_acci_nunique"] = g["ACCI_DVSN"].nunique()
 
     if "HOSP_SPEC_DVSN" in cl.columns:
-        base["drz_hosp_spec_nunique"] = g["HOSP_SPEC_DVSN"].nunique()
+        base["claim_agg_hosp_spec_nunique"] = g["HOSP_SPEC_DVSN"].nunique()
 
     if "HEED_HOSP_YN" in cl.columns:
         yn = cl["HEED_HOSP_YN"].astype(str).str.upper().str.strip()
         cl["_heed"] = (yn == "Y").astype(float)
-        base["drz_heed_frac"] = cl.groupby(ID_COL, sort=False)["_heed"].mean()
+        base["claim_agg_heed_frac"] = cl.groupby(ID_COL, sort=False)["_heed"].mean()
 
     if "VLID_HOSP_OTDA" in cl.columns:
         cl["_vlid"] = pd.to_numeric(cl["VLID_HOSP_OTDA"], errors="coerce")
         gv = cl.groupby(ID_COL, sort=False)["_vlid"]
-        base["drz_vlid_std"] = gv.std()
-        base["drz_vlid_max"] = gv.max()
+        base["claim_agg_vlid_std"] = gv.std()
+        base["claim_agg_vlid_max"] = gv.max()
 
     if "HOUSE_HOSP_DIST" in cl.columns:
         cl["_hdist"] = pd.to_numeric(cl["HOUSE_HOSP_DIST"], errors="coerce")
-        base["drz_house_hosp_dist_mean"] = cl.groupby(ID_COL, sort=False)["_hdist"].mean()
+        base["claim_agg_house_hosp_dist_mean"] = cl.groupby(ID_COL, sort=False)["_hdist"].mean()
 
     if "RECP_DATE" in cl.columns:
         rd = pd.to_numeric(cl["RECP_DATE"], errors="coerce")
@@ -251,28 +258,21 @@ def _dupreez_claim_insight_features(claim_df: pd.DataFrame | None) -> pd.DataFra
     else:
         cl["_recp_dt"] = pd.NaT
 
-    def _span_days(s: pd.Series) -> float:
-        if s.notna().sum() == 0:
-            return np.nan
-        lo, hi = s.min(), s.max()
-        if pd.isna(lo) or pd.isna(hi):
-            return np.nan
-        return float((hi - lo).days)
-
-    span = cl.groupby(ID_COL, sort=False)["_recp_dt"].apply(_span_days)
-    base["drz_claim_intensity"] = base["drz_n_claims"] / (span.clip(lower=1.0) / 30.0 + 1e-6)
+    span_stats = cl.groupby(ID_COL, sort=False)["_recp_dt"].agg(["min", "max"])
+    span_days = (span_stats["max"] - span_stats["min"]).dt.days.astype("float64")
+    base["claim_agg_claim_intensity"] = base["claim_agg_n_claims"] / (span_days.clip(lower=1.0) / 30.0 + 1e-6)
 
     cl_s = cl.sort_values([ID_COL, "_recp_dt"], kind="mergesort")
     if "HOSP_CODE" in cl_s.columns:
         ph = cl_s.groupby(ID_COL, sort=False)["HOSP_CODE"].shift(1)
         sw = (cl_s["HOSP_CODE"].astype(str) != ph.astype(str)).fillna(False).astype(int)
-        sw_sum = cl_s.assign(_drz_sw=sw).groupby(ID_COL, sort=False)["_drz_sw"].sum()
-        base["drz_hosp_switch_count"] = (sw_sum - 1).clip(lower=0).reindex(base.index, fill_value=0)
+        sw_sum = cl_s.assign(_sw=sw).groupby(ID_COL, sort=False)["_sw"].sum()
+        base["claim_agg_hosp_switch_count"] = (sw_sum - 1).clip(lower=0).reindex(base.index, fill_value=0)
 
     cl_s = cl.sort_values([ID_COL, "_recp_dt"], kind="mergesort")
     cl_s["_gd"] = cl_s.groupby(ID_COL, sort=False)["_recp_dt"].diff().dt.total_seconds() / 86400.0
-    base["drz_recp_gap_mean_days"] = cl_s.groupby(ID_COL, sort=False)["_gd"].mean()
-    base["drz_recp_gap_min_days"] = cl_s.groupby(ID_COL, sort=False)["_gd"].min()
+    base["claim_agg_recp_gap_mean_days"] = cl_s.groupby(ID_COL, sort=False)["_gd"].mean()
+    base["claim_agg_recp_gap_min_days"] = cl_s.groupby(ID_COL, sort=False)["_gd"].min()
 
     if "HOSP_CODE" in cl.columns:
         cl_w = cl.loc[cl["_recp_dt"].notna()].copy()
@@ -282,24 +282,27 @@ def _dupreez_claim_insight_features(claim_df: pd.DataFrame | None) -> pd.DataFra
             wk = wk[wk > 1].reset_index(name="_n")
             if not wk.empty:
                 multi = wk.groupby(ID_COL, sort=False).size()
-                base["drz_weeks_multi_hosp"] = multi.reindex(base.index, fill_value=0)
+                base["claim_agg_weeks_multi_hosp"] = multi.reindex(base.index, fill_value=0)
             else:
-                base["drz_weeks_multi_hosp"] = 0
+                base["claim_agg_weeks_multi_hosp"] = 0
         else:
-            base["drz_weeks_multi_hosp"] = 0
+            base["claim_agg_weeks_multi_hosp"] = 0
 
     out = base.reset_index()
-    drz_cols = [c for c in out.columns if c.startswith("drz_")]
-    out[drz_cols] = out[drz_cols].apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    feat_cols = [c for c in out.columns if c.startswith("claim_agg_")]
+    out[feat_cols] = (
+        out[feat_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0.0)
+    )
     return out
 
 
-class BookDupreezPaperStrategy(BaseStrategy):
+class BookClaimAggStrategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
-        return (
-            "『머신러닝을 이용한 데이터 분석』 6장 3절 + du Preez et al. (2025) Aim 문헌고찰 CLAIM 파생 drz_*"
-        )
+        return "6장 3절 PDF 동일 + 청구 데이터 일반 집계 파생 claim_agg_*"
 
     def preprocess(
         self,
@@ -372,12 +375,12 @@ class BookDupreezPaperStrategy(BaseStrategy):
             if new_cols:
                 X_out[new_cols] = X_out[new_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
 
-        drz = _dupreez_claim_insight_features(claim_df)
-        if not drz.empty:
-            X_out = X_out.merge(drz, on=ID_COL, how="left")
-            drz_cols = [c for c in drz.columns if c != ID_COL]
-            if drz_cols:
-                X_out[drz_cols] = X_out[drz_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
+        claim_agg = _claim_aggregation_features(claim_df)
+        if not claim_agg.empty:
+            X_out = X_out.merge(claim_agg, on=ID_COL, how="left")
+            cols = [c for c in claim_agg.columns if c != ID_COL]
+            if cols:
+                X_out[cols] = X_out[cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
 
         scale_present = [c for c in _SCALE_COLS if c in X_out.columns]
         if scale_present:
