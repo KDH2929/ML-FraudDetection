@@ -1,0 +1,44 @@
+{
+  "strategy_id": "member_a_strategy_5",
+  "lgbm_n_estimators": 200,
+  "best_threshold": 0.644063426299511,
+  "default_performance": {
+    "recall": 0.7103321033210332,
+    "f1": 0.5959752321981424,
+    "precision": 0.5133333333333333
+  },
+  "optimized_performance": {
+    "recall": 0.6383763837638377,
+    "f1": 0.6156583629893239,
+    "precision": 0.5945017182130584
+  },
+  "improvement": {
+    "recall": -0.0719557195571956,
+    "f1": 0.019683130791181447,
+    "precision": 0.08116838487972511
+  },
+  "misclassification_analysis": {
+    "confusion_matrix": {
+      "TN": 5405,
+      "FP": 236,
+      "FN": 196,
+      "TP": 346
+    },
+    "fn_count": 196,
+    "fp_count": 236,
+    "fn_avg_proba": 0.2840539840535215,
+    "fp_avg_proba": 0.8210451108072664,
+    "fn_distinctive_features": {
+      "claim_agg_dmnd_paym_spread_mean": 7622.696171073244,
+      "JPBASE_HSHD_INCM": 6591.585561263459,
+      "claim_agg_claim_intensity": 888.0466975291072,
+      "ma3_max_nonpay_ratio": 455.1993031591885,
+      "TOTALPREM": 282.1692537171026,
+      "RESI_COST": 270.2184103677905,
+      "CUST_INCM": 170.50057951167733,
+      "claim_agg_dsas_top_share": 115.04262827639941,
+      "MAX_PRM": 113.30109046588903,
+      "cust_claim_peer_paym_z": 89.61036681528549
+    }
+  }
+}

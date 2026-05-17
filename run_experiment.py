@@ -34,6 +34,11 @@ if __name__ == "__main__":
         help="이미 CSV가 있어도 전처리를 다시 실행함",
     )
     parser.add_argument(
+        "--force-stage-cache",
+        action="store_true",
+        help="Rebuild intermediate preprocessing stage CSV cache too.",
+    )
+    parser.add_argument(
         "--use-tuning",
         action="store_true",
         help="artifacts/{strategy}_tuning_results.json 이 있으면 LGBM 하이퍼파라미터 병합 (임계값은 STRATEGY_THRESHOLDS 또는 artifacts/{strategy}_threshold_analysis.json)",
@@ -54,9 +59,16 @@ if __name__ == "__main__":
 
     if args.prepare_only:
         if args.all:
-            ensure_processed_csvs(force=args.force_preprocess)
+            ensure_processed_csvs(
+                force=args.force_preprocess,
+                force_stage_cache=args.force_stage_cache,
+            )
         elif target_strategy:
-            ensure_processed_csv(target_strategy, force=args.force_preprocess)
+            ensure_processed_csv(
+                target_strategy,
+                force=args.force_preprocess,
+                force_stage_cache=args.force_stage_cache,
+            )
         else:
             parser.error("--prepare-only 는 --strategy/--member 또는 --all 과 함께 사용해야 합니다.")
     elif args.all:
@@ -64,6 +76,7 @@ if __name__ == "__main__":
             model_name=args.model,
             force_preprocess=args.force_preprocess,
             use_optimization=args.use_tuning,
+            force_stage_cache=args.force_stage_cache,
         )
     elif target_strategy:
         run(
@@ -71,6 +84,7 @@ if __name__ == "__main__":
             model_name=args.model,
             force_preprocess=args.force_preprocess,
             use_optimization=args.use_tuning,
+            force_stage_cache=args.force_stage_cache,
         )
 
         # 실험 완료 후 보고서 자동 생성

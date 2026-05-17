@@ -3,6 +3,7 @@ import pandas as pd
 from src.config import DIVIDED_SET_COL, ID_COL, TARGET_COL
 from src.pipeline.data_loader import load_claim_data, load_customer_data, normalize_target
 from src.preprocessing.preprocessor_factory import STRATEGY_REGISTRY, get_strategy
+from src.preprocessing.stage_cache import stage_cache_context
 from src.project_paths import processed_csv_path
 
 
@@ -43,7 +44,12 @@ def _validate_processed_dataframe(member: str, df: pd.DataFrame):
         )
 
 
-def build_processed_dataframe(member: str, strategy_kwargs: dict | None = None) -> pd.DataFrame:
+def build_processed_dataframe(
+    member: str,
+    strategy_kwargs: dict | None = None,
+    *,
+    force_stage_cache: bool = False,
+) -> pd.DataFrame:
     # 전략은 X만 가공하고, 공통부가 메타 컬럼/타깃을 붙여 최종 CSV 형태를 맞춘다.
     strategy = get_strategy(member, **(strategy_kwargs or {}))
     cust_df = load_customer_data()
@@ -51,7 +57,8 @@ def build_processed_dataframe(member: str, strategy_kwargs: dict | None = None) 
 
     y = normalize_target(cust_df[TARGET_COL])
     raw_X = cust_df.drop(columns=[TARGET_COL]).copy()
-    processed_X = strategy.preprocess(raw_X.copy(), y.copy(), claim_df=claim_df.copy())
+    with stage_cache_context(force=force_stage_cache):
+        processed_X = strategy.preprocess(raw_X.copy(), y.copy(), claim_df=claim_df.copy())
 
     if not isinstance(processed_X, pd.DataFrame):
         raise TypeError(f"{member} 전략은 pandas DataFrame을 반환해야 합니다.")
@@ -74,13 +81,23 @@ def build_processed_dataframe(member: str, strategy_kwargs: dict | None = None) 
     return processed_df
 
 
-def ensure_processed_csv(member: str, force: bool = False, strategy_kwargs: dict | None = None):
+def ensure_processed_csv(
+    member: str,
+    force: bool = False,
+    strategy_kwargs: dict | None = None,
+    *,
+    force_stage_cache: bool = False,
+):
     processed_path = processed_csv_path(member)
     if processed_path.exists() and not force:
         return processed_path
 
     try:
-        processed_df = build_processed_dataframe(member, strategy_kwargs=strategy_kwargs)
+        processed_df = build_processed_dataframe(
+            member,
+            strategy_kwargs=strategy_kwargs,
+            force_stage_cache=force_stage_cache,
+        )
     except NotImplementedError:
         print(f"[SKIP] {member} 전략은 아직 구현되지 않았습니다.")
         return None
@@ -91,9 +108,13 @@ def ensure_processed_csv(member: str, force: bool = False, strategy_kwargs: dict
     return processed_path
 
 
-def ensure_processed_csvs(members=None, force: bool = False):
+def ensure_processed_csvs(members=None, force: bool = False, *, force_stage_cache: bool = False):
     members = members or list(STRATEGY_REGISTRY.keys())
     prepared = {}
     for member in members:
-        prepared[member] = ensure_processed_csv(member, force=force)
+        prepared[member] = ensure_processed_csv(
+            member,
+            force=force,
+            force_stage_cache=force_stage_cache,
+        )
     return prepared

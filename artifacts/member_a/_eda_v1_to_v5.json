@@ -1,0 +1,612 @@
+{
+  "v1": {
+    "strategy_id": "member_a",
+    "n_rows": 22400,
+    "n_features": 30,
+    "siu_pos": 1806,
+    "siu_pos_rate": 0.08764012228854273,
+    "feature_groups": {
+      "v2 (KMeans/PCA)": 0,
+      "v3 (domain agg + SIU exposure)": 0,
+      "v4 (claim aggregations)": 0,
+      "v4 (within-spec peer Z)": 0,
+      "v4 (customer claim behavior)": 0,
+      "v1 baseline": 30
+    },
+    "top10_abs_skew": {
+      "MINCRDT": 25.96220960458168,
+      "paym_rate": 19.76589317800961,
+      "CUST_RGST": 11.666802116811485,
+      "sum_dmnd_amt": 10.619171440475931,
+      "sum_paym_amt": 10.598630648799764,
+      "mean_hosp_days": 5.291061788569224,
+      "claim_cnt": 4.579905032975588,
+      "nunique_hosp": 4.188519815156261,
+      "mean_hosp_dist": 4.030285713795546,
+      "is_heed_hosp": 4.015048396460176
+    },
+    "top10_abs_kurt": {
+      "MINCRDT": 879.6634411176022,
+      "paym_rate": 436.0855936447387,
+      "sum_paym_amt": 201.90080458210238,
+      "sum_dmnd_amt": 201.56487463966334,
+      "CUST_RGST": 134.17774296591026,
+      "mean_hosp_days": 102.80845983050304,
+      "claim_cnt": 34.74752249556127,
+      "nunique_hosp": 33.581341661247876,
+      "mean_hosp_dist": 18.40591075699844,
+      "is_heed_hosp": 14.121984217194623
+    },
+    "top20_anova_F": [
+      {
+        "feature": "nunique_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_cnt",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "mean_hosp_days",
+        "F": 1982.2513880501929
+      },
+      {
+        "feature": "sum_paym_amt",
+        "F": 597.9647116516539
+      },
+      {
+        "feature": "sum_dmnd_amt",
+        "F": 589.3025238210968
+      },
+      {
+        "feature": "is_heed_hosp",
+        "F": 423.01634893516496
+      },
+      {
+        "feature": "CTPR",
+        "F": 376.8676582825346
+      },
+      {
+        "feature": "OCCP_GRP_1",
+        "F": 229.6328818289936
+      },
+      {
+        "feature": "RESI_COST",
+        "F": 86.02533218944886
+      },
+      {
+        "feature": "MAXCRDT",
+        "F": 83.30765176995466
+      },
+      {
+        "feature": "LTBN_CHLD_AGE",
+        "F": 65.90829324876512
+      },
+      {
+        "feature": "RESI_TYPE_CODE",
+        "F": 60.37835184379052
+      },
+      {
+        "feature": "AGE",
+        "F": 55.46906674368609
+      },
+      {
+        "feature": "SEX",
+        "F": 44.66234283973363
+      },
+      {
+        "feature": "MATE_OCCP_GRP_1",
+        "F": 31.381277419206537
+      },
+      {
+        "feature": "CHLD_CNT",
+        "F": 29.064861730027523
+      },
+      {
+        "feature": "RCBASE_HSHD_INCM",
+        "F": 18.733543495672507
+      },
+      {
+        "feature": "WEDD_YN",
+        "F": 17.304290171575396
+      },
+      {
+        "feature": "MAX_PAYM_YM",
+        "F": 17.10239648285982
+      },
+      {
+        "feature": "MINCRDT",
+        "F": 15.678299846478112
+      }
+    ],
+    "lgbm_holdout_auc": 0.9019468035488721
+  },
+  "v2": {
+    "strategy_id": "member_a_strategy_2",
+    "n_rows": 22400,
+    "n_features": 35,
+    "siu_pos": 1806,
+    "siu_pos_rate": 0.08764012228854273,
+    "feature_groups": {
+      "v2 (KMeans/PCA)": 5,
+      "v3 (domain agg + SIU exposure)": 0,
+      "v4 (claim aggregations)": 0,
+      "v4 (within-spec peer Z)": 0,
+      "v4 (customer claim behavior)": 0,
+      "v1 baseline": 30
+    },
+    "top10_abs_skew": {
+      "MINCRDT": 25.96220960458168,
+      "paym_rate": 19.76589317800961,
+      "CUST_RGST": 11.666802116811485,
+      "sum_dmnd_amt": 10.619171440475931,
+      "sum_paym_amt": 10.598630648799764,
+      "ma2_kmeans_dist": 6.827126095731034,
+      "mean_hosp_days": 5.291061788569224,
+      "claim_cnt": 4.579905032975588,
+      "nunique_hosp": 4.188519815156261,
+      "mean_hosp_dist": 4.030285713795546
+    },
+    "top10_abs_kurt": {
+      "MINCRDT": 879.6634411176022,
+      "paym_rate": 436.0855936447387,
+      "sum_paym_amt": 201.90080458210238,
+      "sum_dmnd_amt": 201.56487463966334,
+      "CUST_RGST": 134.17774296591026,
+      "mean_hosp_days": 102.80845983050304,
+      "ma2_kmeans_dist": 95.10865779751587,
+      "claim_cnt": 34.74752249556127,
+      "nunique_hosp": 33.581341661247876,
+      "ma2_pca_1": 20.526280629990197
+    },
+    "top20_anova_F": [
+      {
+        "feature": "nunique_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_cnt",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "ma2_pca_1",
+        "F": 2256.143728115657
+      },
+      {
+        "feature": "mean_hosp_days",
+        "F": 1982.2513880501929
+      },
+      {
+        "feature": "ma2_pca_0",
+        "F": 937.2566236949318
+      },
+      {
+        "feature": "sum_paym_amt",
+        "F": 597.9647116516539
+      },
+      {
+        "feature": "sum_dmnd_amt",
+        "F": 589.3025238210968
+      },
+      {
+        "feature": "is_heed_hosp",
+        "F": 423.01634893516496
+      },
+      {
+        "feature": "CTPR",
+        "F": 376.8676582825346
+      },
+      {
+        "feature": "ma2_kmeans_dist",
+        "F": 356.6858986255138
+      },
+      {
+        "feature": "ma2_kmeans_cluster",
+        "F": 329.2147614094024
+      },
+      {
+        "feature": "OCCP_GRP_1",
+        "F": 229.6328818289936
+      },
+      {
+        "feature": "ma2_pca_2",
+        "F": 179.76209231215114
+      },
+      {
+        "feature": "RESI_COST",
+        "F": 86.02533218944886
+      },
+      {
+        "feature": "MAXCRDT",
+        "F": 83.30765176995466
+      },
+      {
+        "feature": "LTBN_CHLD_AGE",
+        "F": 65.90829324876512
+      },
+      {
+        "feature": "RESI_TYPE_CODE",
+        "F": 60.37835184379052
+      },
+      {
+        "feature": "AGE",
+        "F": 55.46906674368609
+      },
+      {
+        "feature": "SEX",
+        "F": 44.66234283973363
+      },
+      {
+        "feature": "MATE_OCCP_GRP_1",
+        "F": 31.381277419206537
+      }
+    ],
+    "lgbm_holdout_auc": 0.9010931431774873
+  },
+  "v3": {
+    "strategy_id": "member_a_strategy_3",
+    "n_rows": 22400,
+    "n_features": 42,
+    "siu_pos": 1806,
+    "siu_pos_rate": 0.08764012228854273,
+    "feature_groups": {
+      "v2 (KMeans/PCA)": 0,
+      "v3 (domain agg + SIU exposure)": 12,
+      "v4 (claim aggregations)": 0,
+      "v4 (within-spec peer Z)": 0,
+      "v4 (customer claim behavior)": 0,
+      "v1 baseline": 30
+    },
+    "top10_abs_skew": {
+      "MINCRDT": 25.96220960458168,
+      "ma3_mean_paym_dmnd_ratio": 22.338864236004582,
+      "paym_rate": 19.76589317800961,
+      "ma3_std_dmnd_amt": 17.61280082337067,
+      "ma3_max_dmnd_amt": 12.867232935714089,
+      "CUST_RGST": 11.666802116811485,
+      "sum_dmnd_amt": 10.619171440475931,
+      "sum_paym_amt": 10.598630648799764,
+      "ma3_frac_heed_claim_rows": 6.456910364267425,
+      "mean_hosp_days": 5.291061788569224
+    },
+    "top10_abs_kurt": {
+      "MINCRDT": 879.6634411176022,
+      "ma3_std_dmnd_amt": 558.2696484176872,
+      "ma3_mean_paym_dmnd_ratio": 544.1046858900754,
+      "paym_rate": 436.0855936447387,
+      "ma3_max_dmnd_amt": 266.6461519203205,
+      "sum_paym_amt": 201.90080458210238,
+      "sum_dmnd_amt": 201.56487463966334,
+      "CUST_RGST": 134.17774296591026,
+      "mean_hosp_days": 102.80845983050304,
+      "ma3_frac_heed_claim_rows": 44.144238062974836
+    },
+    "top20_anova_F": [
+      {
+        "feature": "nunique_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_cnt",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "mean_hosp_days",
+        "F": 1982.2513880501929
+      },
+      {
+        "feature": "ma3_nunique_acci_dvsn",
+        "F": 1698.8678007203346
+      },
+      {
+        "feature": "sum_paym_amt",
+        "F": 597.9647116516539
+      },
+      {
+        "feature": "sum_dmnd_amt",
+        "F": 589.3025238210968
+      },
+      {
+        "feature": "is_heed_hosp",
+        "F": 423.01634893516496
+      },
+      {
+        "feature": "CTPR",
+        "F": 376.8676582825346
+      },
+      {
+        "feature": "OCCP_GRP_1",
+        "F": 229.6328818289936
+      },
+      {
+        "feature": "ma3_max_nonpay_ratio",
+        "F": 212.1464659766816
+      },
+      {
+        "feature": "RESI_COST",
+        "F": 86.02533218944886
+      },
+      {
+        "feature": "MAXCRDT",
+        "F": 83.30765176995466
+      },
+      {
+        "feature": "LTBN_CHLD_AGE",
+        "F": 65.90829324876512
+      },
+      {
+        "feature": "RESI_TYPE_CODE",
+        "F": 60.37835184379052
+      },
+      {
+        "feature": "AGE",
+        "F": 55.46906674368609
+      },
+      {
+        "feature": "SEX",
+        "F": 44.66234283973363
+      },
+      {
+        "feature": "ma3_max_dmnd_amt",
+        "F": 36.91205903769351
+      },
+      {
+        "feature": "MATE_OCCP_GRP_1",
+        "F": 31.381277419206537
+      },
+      {
+        "feature": "CHLD_CNT",
+        "F": 29.064861730027523
+      },
+      {
+        "feature": "ma3_frac_heed_claim_rows",
+        "F": 26.522552241591967
+      }
+    ],
+    "lgbm_holdout_auc": 0.9054248971846216
+  },
+  "v4": {
+    "strategy_id": "member_a_strategy_4",
+    "n_rows": 22400,
+    "n_features": 88,
+    "siu_pos": 1806,
+    "siu_pos_rate": 0.08764012228854273,
+    "feature_groups": {
+      "v2 (KMeans/PCA)": 0,
+      "v3 (domain agg + SIU exposure)": 12,
+      "v4 (claim aggregations)": 21,
+      "v4 (within-spec peer Z)": 3,
+      "v4 (customer claim behavior)": 22,
+      "v1 baseline": 30
+    },
+    "top10_abs_skew": {
+      "cust_claim_paym_dmnd_ratio": 143.55138452832853,
+      "claim_agg_dmnd_paym_spread_mean": 64.51442624215588,
+      "cust_claim_paym_mean": 27.922630415386596,
+      "cust_claim_dmnd_mean": 27.590179346328686,
+      "MINCRDT": 25.96220960458168,
+      "ma3_mean_paym_dmnd_ratio": 22.338864236004582,
+      "paym_rate": 19.76589317800961,
+      "ma3_std_dmnd_amt": 17.61280082337067,
+      "cust_claim_tenure_m": 14.080416682608725,
+      "cust_claim_paym_max": 12.909183464524855
+    },
+    "top10_abs_kurt": {
+      "cust_claim_paym_dmnd_ratio": 20607.000000000015,
+      "claim_agg_dmnd_paym_spread_mean": 4528.955760437944,
+      "cust_claim_paym_mean": 1069.3231528657102,
+      "cust_claim_dmnd_mean": 1040.3744114791136,
+      "MINCRDT": 879.6634411176022,
+      "ma3_std_dmnd_amt": 558.2696484176872,
+      "ma3_mean_paym_dmnd_ratio": 544.1046858900754,
+      "paym_rate": 436.0855936447387,
+      "claim_agg_vlid_std": 328.8857363937855,
+      "cust_claim_paym_max": 270.31769554308005
+    },
+    "top20_anova_F": [
+      {
+        "feature": "claim_agg_n_doc",
+        "F": 5105.061208243768
+      },
+      {
+        "feature": "cust_claim_vlid_sum",
+        "F": 5010.539653401348
+      },
+      {
+        "feature": "claim_agg_dsas_nunique",
+        "F": 4861.708919914726
+      },
+      {
+        "feature": "nunique_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "cust_claim_hosp_nunique",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_agg_n_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_agg_hosp_switch_count",
+        "F": 4563.850601477475
+      },
+      {
+        "feature": "peer_z_n_hosp_spec",
+        "F": 3869.836150925005
+      },
+      {
+        "feature": "cust_claim_claim_rows",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "claim_cnt",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "claim_agg_n_claims",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "claim_agg_hosp_spec_nunique",
+        "F": 3295.944788072085
+      },
+      {
+        "feature": "peer_z_claim_count_spec",
+        "F": 3095.9985239412413
+      },
+      {
+        "feature": "mean_hosp_days",
+        "F": 1982.2513880501929
+      },
+      {
+        "feature": "cust_claim_top_hosp_share",
+        "F": 1772.2235286869247
+      },
+      {
+        "feature": "claim_agg_acci_nunique",
+        "F": 1698.8678007203346
+      },
+      {
+        "feature": "ma3_nunique_acci_dvsn",
+        "F": 1698.8678007203346
+      },
+      {
+        "feature": "cust_claim_vlid_max",
+        "F": 1594.2426125985667
+      },
+      {
+        "feature": "claim_agg_vlid_max",
+        "F": 1594.2426125985667
+      },
+      {
+        "feature": "claim_agg_dsas_top_share",
+        "F": 1514.399018886981
+      }
+    ],
+    "lgbm_holdout_auc": 0.919961981041544
+  },
+  "v5": {
+    "strategy_id": "member_a_strategy_5",
+    "n_rows": 22400,
+    "n_features": 77,
+    "siu_pos": 1806,
+    "siu_pos_rate": 0.08764012228854273,
+    "feature_groups": {
+      "v2 (KMeans/PCA)": 0,
+      "v3 (domain agg + SIU exposure)": 12,
+      "v4 (claim aggregations)": 21,
+      "v4 (within-spec peer Z)": 3,
+      "v4 (customer claim behavior)": 11,
+      "v1 baseline": 30
+    },
+    "top10_abs_skew": {
+      "claim_agg_dmnd_paym_spread_mean": 64.51442624215588,
+      "MINCRDT": 25.96220960458168,
+      "ma3_mean_paym_dmnd_ratio": 22.338864236004582,
+      "paym_rate": 19.76589317800961,
+      "ma3_std_dmnd_amt": 17.61280082337067,
+      "cust_claim_tenure_m": 14.080416682608725,
+      "ma3_max_dmnd_amt": 12.867232935714089,
+      "CUST_RGST": 11.666802116811485,
+      "peer_z_paym_sum_spec": 11.284022532322313,
+      "sum_dmnd_amt": 10.619171440475931
+    },
+    "top10_abs_kurt": {
+      "claim_agg_dmnd_paym_spread_mean": 4528.955760437944,
+      "MINCRDT": 879.6634411176022,
+      "ma3_std_dmnd_amt": 558.2696484176872,
+      "ma3_mean_paym_dmnd_ratio": 544.1046858900754,
+      "paym_rate": 436.0855936447387,
+      "claim_agg_vlid_std": 328.8857363937855,
+      "ma3_max_dmnd_amt": 266.6461519203205,
+      "peer_z_paym_sum_spec": 231.0352890107086,
+      "sum_paym_amt": 201.90080458210238,
+      "cust_claim_paym_sum": 201.90080458210238
+    },
+    "top20_anova_F": [
+      {
+        "feature": "claim_agg_n_doc",
+        "F": 5105.061208243768
+      },
+      {
+        "feature": "claim_agg_dsas_nunique",
+        "F": 4861.708919914726
+      },
+      {
+        "feature": "nunique_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_agg_n_hosp",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "cust_claim_hosp_nunique",
+        "F": 4793.87700638464
+      },
+      {
+        "feature": "claim_agg_hosp_switch_count",
+        "F": 4563.850601477475
+      },
+      {
+        "feature": "peer_z_n_hosp_spec",
+        "F": 3869.836150925005
+      },
+      {
+        "feature": "claim_cnt",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "claim_agg_n_claims",
+        "F": 3639.985249984842
+      },
+      {
+        "feature": "claim_agg_hosp_spec_nunique",
+        "F": 3295.944788072085
+      },
+      {
+        "feature": "peer_z_claim_count_spec",
+        "F": 3095.9985239412413
+      },
+      {
+        "feature": "mean_hosp_days",
+        "F": 1982.2513880501929
+      },
+      {
+        "feature": "ma3_nunique_acci_dvsn",
+        "F": 1698.8678007203346
+      },
+      {
+        "feature": "claim_agg_acci_nunique",
+        "F": 1698.8678007203346
+      },
+      {
+        "feature": "cust_claim_vlid_max",
+        "F": 1594.2426125985667
+      },
+      {
+        "feature": "claim_agg_vlid_max",
+        "F": 1594.2426125985667
+      },
+      {
+        "feature": "claim_agg_dsas_top_share",
+        "F": 1514.399018886981
+      },
+      {
+        "feature": "cust_claim_peer_paym_z",
+        "F": 1304.790128786817
+      },
+      {
+        "feature": "claim_agg_weeks_multi_hosp",
+        "F": 1278.1349401851082
+      },
+      {
+        "feature": "peer_z_paym_sum_spec",
+        "F": 1126.6929707871902
+      }
+    ],
+    "lgbm_holdout_auc": 0.9187930223567436
+  }
+}

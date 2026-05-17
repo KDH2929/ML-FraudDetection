@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "strategy_id": "member_a_strategy_4",
+  "stage_name": "a4_peer_z",
+  "fingerprint": "ec8ab61babe2bfc177166a50d440926cd77368e2f9f226794eb625c4a6d55284",
+  "created_at": "2026-05-15T08:46:58.014050+00:00",
+  "rows": 22400,
+  "columns": [
+    "CUST_ID",
+    "peer_z_paym_sum_spec",
+    "peer_z_claim_count_spec",
+    "peer_z_n_hosp_spec"
+  ]
+}

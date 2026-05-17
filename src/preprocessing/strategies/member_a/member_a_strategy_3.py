@@ -1,27 +1,19 @@
 """
-Member A 전처리 v3 — v1 파이프라인 + 도메인 집계·누수 완화 SIU 노출·소득/주택 파생.
+Member A 전처리 v4 (파생변수 추가) — v1 파이프라인 위에 청구 집계·소득/주택·SIU 노출·book 블록 파생변수를 얹은 확장.
 
-`book_pdf_strategy`와는 다른 설계(원-핫·책 3.2 피벗 재현 없음). 목표는 동일 데이터에서
-트리 모델이 쓰기 쉬운 **수치 파생**과 **학습 구간에서만 추정한 병원·의사 SIU 압력**을 더하는 것.
+포함 파생변수 (고객 단위 집계):
+- 청구 금액 변동성·최대, 지급/청구 비율, 의심 병원 청구 비율, 사고 종류 수, 비급여 비율
+- SIU 노출 (train_test 경로에서만 활성, 학습 구간 병원·의사 비율 LOO 추정)
+- 소득/주택 파생 (RESI_COST 결측, 가구소득 추정치 괴리)
+- book 블록: 청구 일반 집계 (claim_agg_*), 동일 과목 동료 Z-score (peer_z_*), 고객-청구 파생 (cust_claim_*)
 
-포함
-- **청구(변수정의서 기반)**: 고객별 청구액 분산·최대, 유의병원 청구 비율, 사고구분 다양도,
-  행별 지급/청구 비율 평균, (있으면) 비급여비율 요약.
-- **SIU 노출(라벨 의존)**: `preprocess`(전역 CSV 생성)에서는 **끈다**. 이유는 `DIVIDED_SET==1` 전체로
-  병원·의사 비율을 만든 뒤 `train_test_split`을 하면, **폴드 밖 동료 라벨이 테스트 피처에 섞이는**
-  교차 누수가 생기기 때문이다. LOO로 자기 청구만 제외해도 이 문제는 남는다.
-  반면 `preprocess_train_test`에서는 전달된 학습 고객 ID로만 비율표를 맞추므로 **SIU 노출을 켠다**.
-- **고객(정의서)**: `RESI_COST==0` 또는 결측 → `ma3_resi_unknown`, 가구소득 두 추정치 차이,
-  개인추정소득과 JPBASE 가구소득 괴리.
-
-고급(HTML 체크리스트) 중 본 파일에서 다루는 것
-- 그룹 기반 대치(GroupMean), 중앙값·최빈값, 타깃 인코딩(과적합 주의), IQR, Robust, 잔여 숫자 강제.
-
-로드맵(미구현)
-- MCAR/MAR/MNAR 가정별 별도 모형, VIF·필터 검정, SMOTE, K-Fold 내 중첩 전처리 등.
+튜닝: python -m src.optimization.hyperparameter_tuner --strategy member_a_strategy_3
+실험 CLI ID: member_a_strategy_3
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -32,12 +24,44 @@ from src.preprocessing.components.missing_value import GroupMeanImputer, MedianI
 from src.preprocessing.components.outlier import IQRCapper
 from src.preprocessing.components.scaler import RobustScalerWrapper
 from src.preprocessing.strategies.base_strategy import BaseStrategy
+from src.preprocessing.stage_cache import (
+    combined_fingerprint,
+    dataframe_fingerprint,
+    file_fingerprint,
+    load_or_build_stage,
+)
+from src.preprocessing.strategies.book.book_claim_agg_strategy import _claim_aggregation_features
+from src.preprocessing.strategies.book.book_cust_claim_strategy import (
+    _customer_addons,
+    _customer_claim_block,
+    _customer_meta_from_X,
+    _peer_frame_for_block,
+)
+from src.preprocessing.strategies.book.book_spec_peer_z_strategy import _within_spec_peer_z
 from .member_a_strategy import (
-    _drop_unused_cust_columns,
+    _build_member_a_raw_features,
     _fill_residual_missing_for_ml,
-    _merge_claim_features,
+    _load_or_build_member_a_raw_features,
     _y_to_float01,
 )
+
+
+_STRATEGY_ID = "member_a_strategy_3"
+_MEMBER_A_DIR = Path(__file__).resolve().parent
+_BOOK_DIR = _MEMBER_A_DIR.parent / "book"
+
+_A4_SOURCE_FILES = (_MEMBER_A_DIR / "member_a_strategy_3.py",)
+_CLAIM_AGG_SOURCE_FILES = (_BOOK_DIR / "book_claim_agg_strategy.py",)
+_PEER_Z_SOURCE_FILES = (_BOOK_DIR / "book_spec_peer_z_strategy.py",)
+_CUST_CLAIM_SOURCE_FILES = (_BOOK_DIR / "book_cust_claim_strategy.py",)
+
+
+def _source_fingerprint(paths: tuple[Path, ...]) -> str:
+    return combined_fingerprint(file_fingerprint(p) for p in paths)
+
+
+def _frame_fingerprints(X: pd.DataFrame, claim_df: pd.DataFrame | None) -> tuple[str, str]:
+    return dataframe_fingerprint(X), dataframe_fingerprint(claim_df)
 
 
 def _y_binary_int(y: pd.Series) -> pd.Series:
@@ -64,7 +88,6 @@ def _ma3_claim_domain_block(
     *,
     include_label_dependent_exposure: bool = True,
 ) -> pd.DataFrame:
-    """고객 단위 추가 집계. SIU 노출은 include_label_dependent_exposure=False면 생략(단일 preprocess·내부 holdout 불일치 시 누수 방지)."""
     if claim_df is None or claim_df.empty or ID_COL not in claim_df.columns:
         return pd.DataFrame()
 
@@ -127,7 +150,6 @@ def _ma3_claim_domain_block(
             key_col: str,
             out_name: str,
         ) -> pd.DataFrame:
-            """학습구간 청구만으로 key별 SIU 비율을 만들되, 동일 고객 청구는 분모·분자에서 제외(자기 라벨 누수 완화)."""
             if key_col not in cl_all.columns or len(cl_fit_) == 0:
                 return pd.DataFrame({ID_COL: cl_all[ID_COL].unique(), out_name: 0.0})
             tot = cl_fit_.groupby(key_col, dropna=False).agg(n_all=(ID_COL, "size"), siu_all=("_siu", "sum"))
@@ -188,10 +210,202 @@ def _ma3_customer_domain_features(X: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-class MemberA3Strategy(BaseStrategy):
+def _build_ma3_raw_features(
+    X: pd.DataFrame,
+    y: pd.Series,
+    claim_df: pd.DataFrame | None,
+    train_cust_ids: frozenset | None,
+    *,
+    include_label_dependent_exposure: bool,
+    use_base_cache: bool = False,
+) -> pd.DataFrame:
+    y_bin = _y_binary_int(y)
+
+    if use_base_cache:
+        X_out = _load_or_build_member_a_raw_features(X, claim_df)
+    else:
+        X_out = _build_member_a_raw_features(X, claim_df)
+
+    extra = _ma3_claim_domain_block(
+        claim_df,
+        X[ID_COL],
+        y_bin,
+        train_cust_ids,
+        include_label_dependent_exposure=include_label_dependent_exposure,
+    )
+    if not extra.empty:
+        X_out = X_out.merge(extra, on=ID_COL, how="left")
+
+    X_out = _ma3_customer_domain_features(X_out)
+    return X_out
+
+
+def _load_or_build_ma3_raw_features(
+    X: pd.DataFrame,
+    y: pd.Series,
+    claim_df: pd.DataFrame | None,
+    train_cust_ids: frozenset | None,
+    *,
+    include_label_dependent_exposure: bool,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    if use_cache and include_label_dependent_exposure:
+        raise ValueError("Label-dependent ma3 features must not use the global stage cache.")
+    if not use_cache:
+        return _build_ma3_raw_features(
+            X,
+            y,
+            claim_df,
+            train_cust_ids,
+            include_label_dependent_exposure=include_label_dependent_exposure,
+            use_base_cache=False,
+        )
+
+    fp = combined_fingerprint(
+        (
+            "a3_raw_features_v1",
+            dataframe_fingerprint(X),
+            dataframe_fingerprint(claim_df),
+            include_label_dependent_exposure,
+            _source_fingerprint(_A4_SOURCE_FILES),
+        )
+    )
+    return load_or_build_stage(
+        strategy_id=_STRATEGY_ID,
+        stage_name="a3_raw_features",
+        fingerprint=fp,
+        builder=lambda: _build_ma3_raw_features(
+            X,
+            y,
+            claim_df,
+            train_cust_ids,
+            include_label_dependent_exposure=include_label_dependent_exposure,
+            use_base_cache=True,
+        ),
+    )
+
+
+def _merge_extra_blocks(
+    X: pd.DataFrame,
+    claim_df: pd.DataFrame | None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    claim_agg = _claim_aggregation_features(claim_df) if claim_df is not None else pd.DataFrame()
+
+    if claim_df is None or claim_df.empty:
+        return claim_agg, pd.DataFrame(), pd.DataFrame()
+
+    meta_peer = X[[ID_COL]].copy()
+    if DIVIDED_SET_COL in X.columns:
+        meta_peer[DIVIDED_SET_COL] = pd.to_numeric(X[DIVIDED_SET_COL], errors="coerce")
+    else:
+        meta_peer[DIVIDED_SET_COL] = 1
+    peer_z = _within_spec_peer_z(claim_df, meta_peer)
+
+    cust_meta = _customer_meta_from_X(X)
+    peer_frame = _peer_frame_for_block(X)
+    cust_claim = _customer_claim_block(claim_df, cust_meta, peer_frame)
+
+    return claim_agg, peer_z, cust_claim
+
+
+def _build_peer_z_block(X: pd.DataFrame, claim_df: pd.DataFrame | None) -> pd.DataFrame:
+    if claim_df is None or claim_df.empty:
+        return pd.DataFrame()
+    meta_peer = X[[ID_COL]].copy()
+    if DIVIDED_SET_COL in X.columns:
+        meta_peer[DIVIDED_SET_COL] = pd.to_numeric(X[DIVIDED_SET_COL], errors="coerce")
+    else:
+        meta_peer[DIVIDED_SET_COL] = 1
+    return _within_spec_peer_z(claim_df, meta_peer)
+
+
+def _build_cust_claim_block(X: pd.DataFrame, claim_df: pd.DataFrame | None) -> pd.DataFrame:
+    if claim_df is None or claim_df.empty:
+        return pd.DataFrame()
+    cust_meta = _customer_meta_from_X(X)
+    peer_frame = _peer_frame_for_block(X)
+    return _customer_claim_block(claim_df, cust_meta, peer_frame)
+
+
+def _merge_extra_blocks_cached(
+    X: pd.DataFrame,
+    claim_df: pd.DataFrame | None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    x_fp, claim_fp = _frame_fingerprints(X, claim_df)
+    claim_agg_fp = combined_fingerprint(
+        ("a4_claim_agg_v1", claim_fp, _source_fingerprint(_CLAIM_AGG_SOURCE_FILES))
+    )
+    peer_z_fp = combined_fingerprint(
+        ("a4_peer_z_v1", x_fp, claim_fp, _source_fingerprint(_PEER_Z_SOURCE_FILES))
+    )
+    cust_claim_fp = combined_fingerprint(
+        ("a4_cust_claim_v1", x_fp, claim_fp, _source_fingerprint(_CUST_CLAIM_SOURCE_FILES))
+    )
+
+    claim_agg = load_or_build_stage(
+        strategy_id=_STRATEGY_ID,
+        stage_name="a4_claim_agg",
+        fingerprint=claim_agg_fp,
+        builder=lambda: _claim_aggregation_features(claim_df) if claim_df is not None else pd.DataFrame(),
+    )
+    peer_z = load_or_build_stage(
+        strategy_id=_STRATEGY_ID,
+        stage_name="a4_peer_z",
+        fingerprint=peer_z_fp,
+        builder=lambda: _build_peer_z_block(X, claim_df),
+    )
+    cust_claim = load_or_build_stage(
+        strategy_id=_STRATEGY_ID,
+        stage_name="a4_cust_claim",
+        fingerprint=cust_claim_fp,
+        builder=lambda: _build_cust_claim_block(X, claim_df),
+    )
+    return claim_agg, peer_z, cust_claim
+
+
+def _build_a4_raw_features(
+    X: pd.DataFrame,
+    y: pd.Series,
+    claim_df: pd.DataFrame | None,
+    train_cust_ids: frozenset | None,
+    *,
+    include_label_dependent_exposure: bool,
+    use_cache: bool = False,
+) -> pd.DataFrame:
+    if use_cache and include_label_dependent_exposure:
+        raise ValueError("Label-dependent A4 raw features must not use the global stage cache.")
+
+    if use_cache:
+        X_out = _load_or_build_ma3_raw_features(
+            X,
+            y,
+            claim_df,
+            train_cust_ids,
+            include_label_dependent_exposure=include_label_dependent_exposure,
+            use_cache=True,
+        )
+    else:
+        X_out = _build_ma3_raw_features(
+            X,
+            y,
+            claim_df,
+            train_cust_ids,
+            include_label_dependent_exposure=include_label_dependent_exposure,
+            use_base_cache=False,
+        )
+
+    blocks = _merge_extra_blocks_cached(X, claim_df) if use_cache else _merge_extra_blocks(X, claim_df)
+    for block in blocks:
+        if block is not None and not block.empty:
+            X_out = X_out.merge(block, on=ID_COL, how="left")
+    X_out = X_out.loc[:, ~X_out.columns.duplicated(keep="first")]
+    return X_out
+
+
+class MemberA4Strategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
-        return "A3: member_a + 도메인 집계·소득·주택 파생 (CSV 경로는 SIU병원·의사 노출 제외, train_test 누수 방지)"
+        return "A4: 파생변수 추가 (청구 집계/SIU 노출/소득-주택/book 블록) + 튜닝"
 
     def preprocess(
         self,
@@ -200,18 +414,14 @@ class MemberA3Strategy(BaseStrategy):
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         train_ids = _train_customer_ids(X)
-        y_bin = _y_binary_int(y)
-
-        X_out = _merge_claim_features(X, claim_df)
-        X_out = _drop_unused_cust_columns(X_out)
-
-        extra = _ma3_claim_domain_block(
-            claim_df, X[ID_COL], y_bin, train_ids, include_label_dependent_exposure=False
+        X_out = _build_a4_raw_features(
+            X,
+            y,
+            claim_df,
+            train_ids,
+            include_label_dependent_exposure=False,
+            use_cache=True,
         )
-        if not extra.empty:
-            X_out = X_out.merge(extra, on=ID_COL, how="left")
-
-        X_out = _ma3_customer_domain_features(X_out)
 
         if "RESI_COST" in X_out.columns:
             X_out["RESI_COST"] = X_out["RESI_COST"].replace(0, pd.NA)
@@ -225,6 +435,12 @@ class MemberA3Strategy(BaseStrategy):
             gim.fit(X_out, y)
             X_out = gim.transform(X_out)
 
+        addons = _customer_addons(X_out)
+        if not addons.empty:
+            ac = [c for c in addons.columns if c != ID_COL]
+            if ac:
+                X_out = X_out.merge(addons[[ID_COL] + ac], on=ID_COL, how="left")
+
         num_cols = [
             c
             for c in X_out.columns
@@ -236,7 +452,7 @@ class MemberA3Strategy(BaseStrategy):
             X_out = med.transform(X_out)
             X_out[num_cols] = X_out[num_cols].apply(pd.to_numeric, errors="coerce")
             med2 = X_out[num_cols].median()
-            X_out[num_cols] = X_out[num_cols].fillna(med2).fillna(0.0).astype(np.float64)
+            X_out[num_cols] = X_out[num_cols].fillna(med2).fillna(0.0).astype("float64")
 
         cat_cols = [c for c in CAT_COLS if c in X_out.columns]
         if cat_cols:
@@ -277,14 +493,14 @@ class MemberA3Strategy(BaseStrategy):
         )
 
         def _path(df: pd.DataFrame, y_block: pd.Series) -> pd.DataFrame:
-            z = _merge_claim_features(df, claim_df)
-            z = _drop_unused_cust_columns(z)
-            extra = _ma3_claim_domain_block(
-                claim_df, df[ID_COL], y_block, train_ids, include_label_dependent_exposure=True
+            z = _build_a4_raw_features(
+                df,
+                y_block,
+                claim_df,
+                train_ids,
+                include_label_dependent_exposure=True,
+                use_cache=False,
             )
-            if not extra.empty:
-                z = z.merge(extra, on=ID_COL, how="left")
-            z = _ma3_customer_domain_features(z)
             if "RESI_COST" in z.columns:
                 z["RESI_COST"] = z["RESI_COST"].replace(0, pd.NA)
             for c in NUM_COLS:
@@ -292,15 +508,25 @@ class MemberA3Strategy(BaseStrategy):
                     z[c] = pd.to_numeric(z[c], errors="coerce")
             return z
 
-        tr = _path(X_train, _y_binary_int(y_train))
-        te_y = pd.Series(0, index=X_test.index, dtype=int)
-        te = _path(X_test, te_y)
+        tr = _path(X_train, y_train)
+        te = _path(X_test, pd.Series(0, index=X_test.index, dtype=int))
 
         if all(c in tr.columns for c in ("OCCP_GRP_1", "AGE", "CUST_INCM")):
             gim = GroupMeanImputer()
             gim.fit(tr, y_train)
             tr = gim.transform(tr)
             te = gim.transform(te)
+
+        for z_name, zdf in (("tr", tr), ("te", te)):
+            addons = _customer_addons(zdf)
+            if not addons.empty:
+                ac = [c for c in addons.columns if c != ID_COL]
+                if ac:
+                    merged = zdf.merge(addons[[ID_COL] + ac], on=ID_COL, how="left")
+                    if z_name == "tr":
+                        tr = merged
+                    else:
+                        te = merged
 
         num_cols = [
             c
@@ -314,9 +540,9 @@ class MemberA3Strategy(BaseStrategy):
             te = med.transform(te)
             tr[num_cols] = tr[num_cols].apply(pd.to_numeric, errors="coerce")
             med2 = tr[num_cols].median()
-            tr[num_cols] = tr[num_cols].fillna(med2).fillna(0.0).astype(np.float64)
+            tr[num_cols] = tr[num_cols].fillna(med2).fillna(0.0).astype("float64")
             te[num_cols] = te[num_cols].apply(pd.to_numeric, errors="coerce")
-            te[num_cols] = te[num_cols].fillna(med2).fillna(0.0).astype(np.float64)
+            te[num_cols] = te[num_cols].fillna(med2).fillna(0.0).astype("float64")
 
         cat_cols = [c for c in CAT_COLS if c in tr.columns]
         if cat_cols:

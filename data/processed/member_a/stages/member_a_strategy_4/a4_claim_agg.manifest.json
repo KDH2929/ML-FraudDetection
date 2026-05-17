@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "strategy_id": "member_a_strategy_4",
+  "stage_name": "a4_claim_agg",
+  "fingerprint": "3e8fdf9422bf9bb7a4161c7df283470c12b38eae7bc67efc1c07167e419664aa",
+  "created_at": "2026-05-15T08:46:48.486497+00:00",
+  "rows": 22400,
+  "columns": [
+    "CUST_ID",
+    "claim_agg_n_claims",
+    "claim_agg_n_hosp",
+    "claim_agg_n_hosp_per_10_claims",
+    "claim_agg_n_doc",
+    "claim_agg_paym_sum",
+    "claim_agg_paym_cv",
+    "claim_agg_paym_max_ratio",
+    "claim_agg_dmnd_paym_spread_mean",
+    "claim_agg_dsas_nunique",
+    "claim_agg_dsas_top_share",
+    "claim_agg_acci_nunique",
+    "claim_agg_hosp_spec_nunique",
+    "claim_agg_heed_frac",
+    "claim_agg_vlid_std",
+    "claim_agg_vlid_max",
+    "claim_agg_house_hosp_dist_mean",
+    "claim_agg_claim_intensity",
+    "claim_agg_hosp_switch_count",
+    "claim_agg_recp_gap_mean_days",
+    "claim_agg_recp_gap_min_days",
+    "claim_agg_weeks_multi_hosp"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "overall_pos_rate": 0.08764012228854273,
+  "n_labeled": 20607,
+  "n_positive": 1806,
+  "ma2_cols": [
+    "ma2_kmeans_cluster",
+    "ma2_kmeans_dist",
+    "ma2_pca_0",
+    "ma2_pca_1",
+    "ma2_pca_2"
+  ],
+  "outputs": [
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\a2_full_lgbm_importance.csv",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\a2_ma2_correlation_heatmap.png",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\a2_pca_kmeans_diagnostic.png",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\ablation_lgbm_threshold_results.csv",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\kmeans_cluster_label_distribution.csv",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\ma2_feature_redundancy_stats.csv",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\top20_mutual_info.csv",
+    "artifacts\\member_a\\member_a_strategy_2\\pca_kmeans_diagnostics\\top20_smd.csv"
+  ]
+}

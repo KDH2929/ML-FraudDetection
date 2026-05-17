@@ -94,8 +94,13 @@ def run_strategy(
     model_name: str = "lgbm",
     force_preprocess: bool = False,
     use_optimization: bool = False,
+    force_stage_cache: bool = False,
 ):
-    processed_csv = ensure_processed_csv(strategy_id, force=force_preprocess)
+    processed_csv = ensure_processed_csv(
+        strategy_id,
+        force=force_preprocess,
+        force_stage_cache=force_stage_cache,
+    )
     if processed_csv is None:
         return []
 
@@ -142,12 +147,14 @@ def run(
     model_name: str = "lgbm",
     force_preprocess: bool = False,
     use_optimization: bool = False,
+    force_stage_cache: bool = False,
 ):
     return run_strategy(
         strategy_id=strategy_id,
         model_name=model_name,
         force_preprocess=force_preprocess,
         use_optimization=use_optimization,
+        force_stage_cache=force_stage_cache,
     )
 
 
@@ -155,8 +162,13 @@ def run_all(
     model_name: str = "lgbm",
     force_preprocess: bool = False,
     use_optimization: bool = False,
+    force_stage_cache: bool = False,
 ):
-    ensure_processed_csvs(STRATEGIES, force=force_preprocess)
+    ensure_processed_csvs(
+        STRATEGIES,
+        force=force_preprocess,
+        force_stage_cache=force_stage_cache,
+    )
 
     all_results = []
     for strategy_id in STRATEGIES:
@@ -165,6 +177,7 @@ def run_all(
             model_name=model_name,
             force_preprocess=False,
             use_optimization=use_optimization,
+            force_stage_cache=False,
         )
         all_results.extend(strategy_results)
 
@@ -214,6 +227,11 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="lgbm", choices=MODEL_OPTIONS + ["all"])
     parser.add_argument("--force-preprocess", action="store_true")
     parser.add_argument(
+        "--force-stage-cache",
+        action="store_true",
+        help="Rebuild cached intermediate preprocessing stages too.",
+    )
+    parser.add_argument(
         "--use-tuning",
         action="store_true",
         help="artifacts/.../tuning_results.json 있으면 LGBM 파라미터 병합",
@@ -235,6 +253,7 @@ if __name__ == "__main__":
             model_name=args.model,
             force_preprocess=args.force_preprocess,
             use_optimization=use_opt,
+            force_stage_cache=args.force_stage_cache,
         )
     elif args.strategy:
         run(
@@ -242,6 +261,7 @@ if __name__ == "__main__":
             model_name=args.model,
             force_preprocess=args.force_preprocess,
             use_optimization=use_opt,
+            force_stage_cache=args.force_stage_cache,
         )
     else:
         parser.error("--strategy 가 필요합니다 (--all 이 아닐 때).")

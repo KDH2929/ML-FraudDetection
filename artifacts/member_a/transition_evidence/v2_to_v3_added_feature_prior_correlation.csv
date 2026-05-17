@@ -1,0 +1,13 @@
+feature,max_abs_corr_with_prior,top_prior_corrs
+ma3_absdiff_hh_incm_est,0.3320782310381746,CUST_INCM:0.332; JPBASE_HSHD_INCM:0.293; IS_MISSING_MATE_OCCP_GRP_1:0.287; CHLD_CNT:0.258; WEDD_YN:0.251
+ma3_cust_minus_jpbase_incm,0.5633778704138298,JPBASE_HSHD_INCM:0.563; CUST_INCM:0.466; RCBASE_HSHD_INCM:0.294; SEX:0.277; MATE_OCCP_GRP_1:0.274
+ma3_doc_hosp_train_cross,,
+ma3_doc_siu_train_expo,,
+ma3_frac_heed_claim_rows,0.789194425403661,is_heed_hosp:0.789; CTPR:0.051; AGE:0.038; claim_cnt:0.034; sum_paym_amt:0.030
+ma3_hosp_siu_train_expo,,
+ma3_max_dmnd_amt,0.8975221456485367,sum_dmnd_amt:0.898; sum_paym_amt:0.895; claim_cnt:0.160; AGE:0.112; WEDD_YN:0.104
+ma3_max_nonpay_ratio,0.34066383041717685,IS_MISSING_MINCRDT:0.341; MAX_PAYM_YM:0.287; acci_pct_3:0.180; mean_hosp_days:0.156; acci_pct_2:0.154
+ma3_mean_paym_dmnd_ratio,0.8678083802137122,paym_rate:0.868; IS_MISSING_MINCRDT:0.037; AGE:0.028; TOTALPREM:0.027; RCBASE_HSHD_INCM:0.026
+ma3_nunique_acci_dvsn,0.5247099452676746,nunique_hosp:0.525; claim_cnt:0.440; mean_hosp_days:0.175; acci_pct_3:0.173; sum_paym_amt:0.139
+ma3_resi_unknown,0.4079848427991141,RCBASE_HSHD_INCM:0.408; RESI_TYPE_CODE:0.190; JPBASE_HSHD_INCM:0.151; RESI_COST:0.070; CHLD_CNT:0.049
+ma3_std_dmnd_amt,0.7611106958815773,sum_dmnd_amt:0.761; sum_paym_amt:0.757; AGE:0.098; WEDD_YN:0.092; claim_cnt:0.086

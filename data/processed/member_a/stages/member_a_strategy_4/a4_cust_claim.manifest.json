@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "strategy_id": "member_a_strategy_4",
+  "stage_name": "a4_cust_claim",
+  "fingerprint": "8a1c01225a10d9a3fb8262733c77e0ccd55c3465c2a4aa73589405b6e2b7b58f",
+  "created_at": "2026-05-15T08:47:13.160357+00:00",
+  "rows": 22400,
+  "columns": [
+    "CUST_ID",
+    "cust_claim_claim_rows",
+    "cust_claim_paym_sum",
+    "cust_claim_dmnd_sum",
+    "cust_claim_paym_mean",
+    "cust_claim_dmnd_mean",
+    "cust_claim_paym_max",
+    "cust_claim_dmnd_max",
+    "cust_claim_paym_dmnd_ratio",
+    "cust_claim_hosp_nunique",
+    "cust_claim_top_hosp_share",
+    "cust_claim_heed_claim_share",
+    "cust_claim_vlid_sum",
+    "cust_claim_vlid_max",
+    "cust_claim_cnt_recent_6m",
+    "cust_claim_cnt_6m_to_12m",
+    "cust_claim_cnt_prior_12m",
+    "cust_claim_recent6_vs_prior_ratio",
+    "cust_claim_tenure_m",
+    "cust_claim_first_claim_lag_m",
+    "cust_claim_peer_paym_z"
+  ]
+}

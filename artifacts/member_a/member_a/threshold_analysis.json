@@ -1,0 +1,44 @@
+{
+  "strategy_id": "member_a",
+  "lgbm_n_estimators": 200,
+  "best_threshold": 0.706897713672116,
+  "default_performance": {
+    "recall": 0.7103321033210332,
+    "f1": 0.541871921182266,
+    "precision": 0.4379977246871445
+  },
+  "optimized_performance": {
+    "recall": 0.5904059040590406,
+    "f1": 0.5755395683453237,
+    "precision": 0.5614035087719298
+  },
+  "improvement": {
+    "recall": -0.11992619926199266,
+    "f1": 0.0336676471630577,
+    "precision": 0.12340578408478531
+  },
+  "misclassification_analysis": {
+    "confusion_matrix": {
+      "TN": 5391,
+      "FP": 250,
+      "FN": 222,
+      "TP": 320
+    },
+    "fn_count": 222,
+    "fp_count": 250,
+    "fn_avg_proba": 0.3418837470613486,
+    "fp_avg_proba": 0.8424763371120271,
+    "fn_distinctive_features": {
+      "JPBASE_HSHD_INCM": 842.3764754394034,
+      "TOTALPREM": 364.12093098348276,
+      "RESI_COST": 236.67260794241741,
+      "CUST_INCM": 185.8331260274833,
+      "MAX_PRM": 92.82738617905841,
+      "MAXCRDT": 61.33623610171776,
+      "nunique_hosp": 57.75538528416917,
+      "claim_cnt": 55.88576267394092,
+      "sum_paym_amt": 55.64105033809832,
+      "sum_dmnd_amt": 55.10540689501383
+    }
+  }
+}

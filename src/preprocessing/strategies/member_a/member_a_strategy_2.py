@@ -1,32 +1,24 @@
 """
-Member A 전처리 v2 — `member_a_strategy` 위에 비지도(군집·PCA) 파생을 얹은 확장.
+Member A 전처리 v2 — v1 위에 KMeans 군집 파생을 얹은 확장.
 
 v1(`MemberAStrategy`)과 동일한 CLAIM 요약 merge·결측·타깃인코딩·IQR·Robust 흐름을 유지한 뒤,
-**통계 적합은 DIVIDED_SET==1 행만** 사용해 라벨·평가구간 정보가 군집/PCA에 직접 들어가지 않게 한다.
-(`DIVIDED_SET` 컬럼이 없으면 전체 행으로 적합 — 노트북/실험용, 이 경우 누수 가능성 있음)
-
-ML 체크리스트(교재·EDA 요약) 대응
-- **Cleaning / 결측:** 그룹 평균(직업·나이·소득), 중앙값·최빈값, `OCCP_GRP_2`·`MATE_OCCP_GRP_2` 제거(6장 3.1과 동일),
-  잔여 결측은 수치=중앙값·비수치=숫자화/라벨코드로 마감(processed_data 숫자 feature 규칙).
-- **Scaling:** Standard(KMeans·PCA 블록), Robust(NUM_COLS).
-- **Encoding:** Target(mean) encoding — 과적합·누수 주의, `preprocess_train_test`로 train-only 적합.
-- **비지도:** KMeans·PCA 파생 특성.
-- **분할·누수:** 군집/PCA의 `preprocess` 경로는 DIVIDED_SET==1만 fit; train/test 경로는 train만 fit.
+**통계 적합은 DIVIDED_SET==1 행만** 사용해 라벨·평가구간 정보가 군집에 직접 들어가지 않게 한다.
+(`DIVIDED_SET` 컬럼이 없으면 전체 행으로 적합 — 노트북/실험용)
 
 추가 열
-- `ma2_kmeans_cluster`, `ma2_kmeans_dist`: NUM_COLS·CLAIM 요약 등 **수치형**만 모아 StandardScaler 후 KMeans.
-- `ma2_pca_0` …: 동일 스케일 공간에서 PCA(학습구간만 fit).
+- `ma2_kmeans_cluster`, `ma2_kmeans_dist`: 수치형 변수를 StandardScaler 후 KMeans 적합.
+  군집 레이블과 중심까지 거리를 파생변수로 추가.
 
-로드맵(미구현, v3+ 후보)
-- MCAR/MAR/MNAR 가정별 별도 모델링, 회귀 imputer, VIF·필터 검정, SMOTE 등
+※ PCA 차원 압축은 v4(member_a_strategy_4)에서 다중공선성 제거와 함께 적용.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 
 from src.config import CAT_COLS, DIVIDED_SET_COL, ID_COL, NUM_COLS
@@ -35,14 +27,32 @@ from src.preprocessing.components.missing_value import GroupMeanImputer, MedianI
 from src.preprocessing.components.outlier import IQRCapper
 from src.preprocessing.components.scaler import RobustScalerWrapper
 from src.preprocessing.strategies.base_strategy import BaseStrategy
+from src.preprocessing.stage_cache import (
+    combined_fingerprint,
+    dataframe_fingerprint,
+    file_fingerprint,
+    load_or_build_stage,
+)
 from .member_a_strategy import (
+    _add_key_missing_indicators,
     _drop_unused_cust_columns,
     _fill_residual_missing_for_ml,
+    _load_or_build_member_a_raw_features,
     _merge_claim_features,
     _y_to_float01,
 )
 
 _RANDOM_STATE = 42
+_STRATEGY_ID = "member_a_strategy_2"
+_MEMBER_A_DIR = Path(__file__).resolve().parent
+_A2_SOURCE_FILES = (
+    _MEMBER_A_DIR / "member_a_strategy.py",
+    _MEMBER_A_DIR / "member_a_strategy_2.py",
+)
+
+
+def _source_fingerprint(paths: tuple[Path, ...]) -> str:
+    return combined_fingerprint(file_fingerprint(p) for p in paths)
 
 
 def _fit_rows_mask(X: pd.DataFrame) -> np.ndarray:
@@ -56,7 +66,6 @@ def _add_cluster_pca(
     X_out: pd.DataFrame,
     *,
     n_clusters: int = 5,
-    n_pca_components: int = 3,
     random_state: int = _RANDOM_STATE,
 ) -> pd.DataFrame:
     meta = {ID_COL, DIVIDED_SET_COL}
@@ -94,21 +103,37 @@ def _add_cluster_pca(
     out = X_out.copy()
     out["ma2_kmeans_cluster"] = labels.astype(np.float64)
     out["ma2_kmeans_dist"] = dist.astype(np.float64)
-
-    n_use = min(n_pca_components, Z_all.shape[1], n_fit)
-    if n_use >= 1:
-        pca = PCA(n_components=n_use, random_state=random_state)
-        pca.fit(Z_all[mask])
-        comp = pca.transform(Z_all)
-        for j in range(comp.shape[1]):
-            out[f"ma2_pca_{j}"] = comp[:, j].astype(np.float64)
     return out
+
+
+def _load_or_build_cluster_pca(
+    X_out: pd.DataFrame,
+    *,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    if not use_cache:
+        return _add_cluster_pca(X_out)
+
+    fp = combined_fingerprint(
+        (
+            "a2_kmeans_v2",
+            dataframe_fingerprint(X_out),
+            _source_fingerprint(_A2_SOURCE_FILES),
+            _RANDOM_STATE,
+        )
+    )
+    return load_or_build_stage(
+        strategy_id=_STRATEGY_ID,
+        stage_name="a2_cluster_pca_features",
+        fingerprint=fp,
+        builder=lambda: _add_cluster_pca(X_out),
+    )
 
 
 class MemberA2Strategy(BaseStrategy):
 
     def get_strategy_name(self) -> str:
-        return "A2: member_a + (DIVIDED_SET=1 fit) KMeans·PCA"
+        return "A2: v1 + KMeans 군집 (DIVIDED_SET=1 fit, PCA는 v4로 이동)"
 
     def preprocess(
         self,
@@ -116,8 +141,7 @@ class MemberA2Strategy(BaseStrategy):
         y: pd.Series,
         claim_df: pd.DataFrame = None,
     ) -> pd.DataFrame:
-        X_out = _merge_claim_features(X, claim_df)
-        X_out = _drop_unused_cust_columns(X_out)
+        X_out = _load_or_build_member_a_raw_features(X, claim_df)
 
         if "RESI_COST" in X_out.columns:
             X_out["RESI_COST"] = X_out["RESI_COST"].replace(0, pd.NA)
@@ -144,7 +168,7 @@ class MemberA2Strategy(BaseStrategy):
             med2 = X_out[num_cols].median()
             X_out[num_cols] = X_out[num_cols].fillna(med2).fillna(0.0).astype(np.float64)
 
-        X_out = _add_cluster_pca(X_out)
+        X_out = _load_or_build_cluster_pca(X_out)
 
         cat_cols = [c for c in CAT_COLS if c in X_out.columns]
         if cat_cols:
@@ -185,6 +209,8 @@ class MemberA2Strategy(BaseStrategy):
         te = _merge_claim_features(X_test, claim_df)
         tr = _drop_unused_cust_columns(tr)
         te = _drop_unused_cust_columns(te)
+        tr = _add_key_missing_indicators(tr)
+        te = _add_key_missing_indicators(te)
 
         for Xs in (tr, te):
             if "RESI_COST" in Xs.columns:
@@ -256,7 +282,6 @@ def _add_cluster_pca_train_test(
     te: pd.DataFrame,
     *,
     n_clusters: int = 5,
-    n_pca_components: int = 3,
     random_state: int = _RANDOM_STATE,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     meta = {ID_COL, DIVIDED_SET_COL}
@@ -301,14 +326,4 @@ def _add_cluster_pca_train_test(
     tr["ma2_kmeans_dist"] = d_tr.astype(np.float64)
     te["ma2_kmeans_cluster"] = lb_te.astype(np.float64)
     te["ma2_kmeans_dist"] = d_te.astype(np.float64)
-
-    n_use = min(n_pca_components, Z_tr.shape[1], len(tr))
-    if n_use >= 1:
-        pca = PCA(n_components=n_use, random_state=random_state)
-        pca.fit(Z_tr)
-        p_tr = pca.transform(Z_tr)
-        p_te = pca.transform(Z_te)
-        for j in range(p_tr.shape[1]):
-            tr[f"ma2_pca_{j}"] = p_tr[:, j].astype(np.float64)
-            te[f"ma2_pca_{j}"] = p_te[:, j].astype(np.float64)
     return tr, te
