@@ -25,7 +25,7 @@
 
 | 담당 트랙 | 주요 역할 | 핵심 산출물 |
 |---|---|---|
-| Member A | 고객 테이블 중심의 기본 전처리와 파생 변수 설계 | `member_a`, `member_a_strategy_2~5` |
+| Member A | 고객 테이블 중심의 기본 전처리와 파생 변수 설계 | `member_a`, `member_a_strategy_2~4` |
 | Member B | Feature Engineering 고도화 + Feature Selection + Hyperparameter Tuning + Threshold 최적화 | `member_b`, `member_b_strategy_2`, `member_b_strategy_3` |
 | Member C | 고객-청구 집계 기반 safe 전처리 파이프라인 설계 및 성능 안정화 | `member_c`, `member_c_strategy_2~4` |
 
@@ -39,9 +39,11 @@
 
 즉, 이 저장소는 "한 개의 모델 파이프라인"이라기보다, `A/B/C` 세 사람이 각자 전처리 전략을 실험하고 공통 러너 위에서 동일 기준으로 비교하는 실험 플랫폼에 가깝습니다.
 
-## 네이밍 정리 안내 (2026-05-13)
+## 네이밍 정리 안내
 
-`book/` 하위의 4개 전략 파일과 `member_a_strategy_4/_5` 출력 컬럼 접두어를 정직한 이름으로 정리했습니다.
+### book 전략 파일명 정리 (2026-05-13)
+
+`book/` 하위의 4개 전략 파일 명칭을 논문 저자명 기반에서 기능 기반으로 변경했습니다.
 
 | 변경 전 | 변경 후 |
 | --- | --- |
@@ -50,25 +52,17 @@
 | `book_survey_paper_strategy.py`, ID `book_survey_paper`, 컬럼 `paper_*` | `book_cust_claim_strategy.py`, ID `book_cust_claim`, 컬럼 `cust_claim_*` |
 | `book_survey_paper_dedup_strategy.py`, ID `book_survey_paper_dedup` | `book_cust_claim_dedup_strategy.py`, ID `book_cust_claim_dedup` |
 
-`member_a_strategy_4`, `member_a_strategy_5`, `test_member_abc` 의 strategy ID와 파일명은 보존되었으나 출력 컬럼이 위 매핑에 따라 변경되었습니다. `MemberA5Strategy(skip_paper_drop=...)` 호출은 `skip_corr_drop` 으로 정리되었으며 `skip_paper_drop` 키워드는 deprecation alias 로 동작합니다.
+### Member A 전략 구조 재편 (2026-05-17)
 
-이로 인해 다음 산출물은 옛 컬럼명을 보유한 stale 상태입니다(필요 시 재생성).
+v1~v5였던 Member A 전략을 v1~v4로 재편했습니다.
 
-- `data/processed/member_a/member_a_strategy_4_preprocessed.csv`, `member_a_strategy_5_preprocessed.csv`
-- `data/processed/test/test_member_abc_preprocessed.csv`
-- `data/processed/book/book_*_preprocessed.csv` (옛 paper/dupreez/bauder/survey 명칭 파일들)
-- `artifacts/member_a/member_a_strategy_4/threshold_analysis.json`
-- `artifacts/test/test_member_abc/threshold_analysis.json`
-- `artifacts/summary/experiment_results.csv`, `artifacts/book/book_*paper*/experiment_results.csv`
+| 변경 전 | 변경 후 | 내용 |
+| --- | --- | --- |
+| `member_a_strategy_3.py` + `member_a_strategy_4.py` | `member_a_strategy_3.py` | 파생변수 추가 (두 전략 합병) |
+| `member_a_strategy_5.py` | `member_a_strategy_4.py` | 다중공선성 제거 + PCA 차원 압축 |
+| `member_a_strategy_5.py` | 폐기 | |
 
-재생성 예시:
-
-```bash
-python -m src.experiment.experiment_runner --strategy test_member_abc --use-optimization
-python -m src.optimization.shared.threshold_optimizer --strategy test_member_abc
-python -m src.experiment.experiment_runner --strategy member_a_strategy_4 --use-optimization
-python -m src.optimization.shared.threshold_optimizer --strategy member_a_strategy_4
-```
+`test_member_abc` 등 Member A를 참조하는 전략도 `member_a_strategy_3` 기준으로 업데이트되었습니다.
 
 ## 성능 비교 요약
 
@@ -142,11 +136,10 @@ CatchCatch/
 │  ├─ preprocessing/
 │  │  ├─ strategies/
 │  │  │  ├─ member_a/
-│  │  │  │  ├─ member_a_strategy_1.py
+│  │  │  │  ├─ member_a_strategy.py
 │  │  │  │  ├─ member_a_strategy_2.py
 │  │  │  │  ├─ member_a_strategy_3.py
-│  │  │  │  ├─ member_a_strategy_4.py
-│  │  │  │  └─ member_a_strategy_5.py
+│  │  │  │  └─ member_a_strategy_4.py
 │  │  │  ├─ member_b/
 │  │  │  │  ├─ member_b_strategy_1.py
 │  │  │  │  ├─ member_b_strategy_2.py
@@ -180,11 +173,10 @@ CatchCatch/
 ├─ data/
 │  └─ processed/
 │     ├─ member_a/
-│     │  ├─ member_a_strategy_1_preprocessed.csv
+│     │  ├─ member_a_preprocessed.csv
 │     │  ├─ member_a_strategy_2_preprocessed.csv
 │     │  ├─ member_a_strategy_3_preprocessed.csv
-│     │  ├─ member_a_strategy_4_preprocessed.csv
-│     │  └─ member_a_strategy_5_preprocessed.csv
+│     │  └─ member_a_strategy_4_preprocessed.csv
 │     ├─ member_b/
 │     │  ├─ member_b_strategy_1_preprocessed.csv
 │     │  ├─ member_b_strategy_2_preprocessed.csv
@@ -197,11 +189,10 @@ CatchCatch/
 │
 ├─ artifacts/
 │  ├─ member_a/
-│  │  ├─ member_a_strategy_1/
+│  │  ├─ member_a/
 │  │  ├─ member_a_strategy_2/
 │  │  ├─ member_a_strategy_3/
-│  │  ├─ member_a_strategy_4/
-│  │  └─ member_a_strategy_5/
+│  │  └─ member_a_strategy_4/
 │  ├─ member_b/
 │  │  ├─ member_b_strategy_1/
 │  │  ├─ member_b_strategy_2/
@@ -215,11 +206,10 @@ CatchCatch/
 └─ docs/
    └─ optimization_reports/
       ├─ member_a/
-      │  ├─ member_a_strategy_1_v1_report.md
+      │  ├─ member_a_v1_report.md
       │  ├─ member_a_strategy_2_v2_report.md
       │  ├─ member_a_strategy_3_v3_report.md
-      │  ├─ member_a_strategy_4_v4_report.md
-      │  └─ member_a_strategy_5_v5_report.md
+      │  └─ member_a_strategy_4_v4_report.md
       ├─ member_b/
       │  ├─ member_b_strategy_1_v1_report.md
       │  ├─ member_b_strategy_2_v2_report.md
@@ -369,27 +359,7 @@ python run_quick_lgbm.py --strategy member_a_strategy_4
 python run_quick_lgbm.py --strategy member_a_strategy_4 --few-trees
 ```
 
-## 7. Feature subset exhaustive search
-
-특정 전략의 전처리 CSV를 기반으로 feature subset을 탐색합니다.
-
-```bash
-python run_feature_subset_exhaustive.py --strategy member_a_strategy_5
-```
-
-고정 개수 조합만 탐색:
-
-```bash
-python run_feature_subset_exhaustive.py --strategy member_a_strategy_5 --mode fixed_k --subset-size 8 --preselect-top 16
-```
-
-CSV 경로 직접 지정:
-
-```bash
-python run_feature_subset_exhaustive.py --csv data/processed/member_a/member_a_strategy_5_preprocessed.csv --max-exhaustive-p 12
-```
-
-## 8. 최적화 보고서 생성
+## 7. 최적화 보고서 생성
 
 ### 단일 보고서 생성
 
